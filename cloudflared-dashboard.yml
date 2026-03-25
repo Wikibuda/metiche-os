@@ -1,0 +1,6 @@
+tunnel: 548ec494-f9e3-49e0-adbe-cf086b768d98
+credentials-file: /Users/gusluna/.cloudflared/548ec494-f9e3-49e0-adbe-cf086b768d98.json
+ingress:
+  - hostname: dashboard.masamadremonterrey.com
+    service: http://localhost:5080
+  - service: http_status:404

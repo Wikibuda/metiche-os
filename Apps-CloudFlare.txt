@@ -1,0 +1,38 @@
+flowchart TD
+    %% Estilos
+    classDef cloudflare fill:#f38020,stroke:#d66a15,stroke-width:2px,color:white;
+    classDef server fill:#2c3e50,stroke:#1a252f,stroke-width:2px,color:white;
+    classDef app fill:#3498db,stroke:#2980b9,stroke-width:2px,color:white;
+    classDef external fill:#ecf0f1,stroke:#bdc3c7,stroke-width:2px,color:#333;
+
+    %% Nodos Externos
+    Users((Usuarios en Internet)):::external
+    
+    %% Nodos Cloudflare
+    subgraph CF [Red de Cloudflare]
+        DNS[DNS masamadremonterrey.com]:::cloudflare
+        Tunnel[Cloudflare Zero Trust Tunnel]:::cloudflare
+    end
+
+    %% Servidor Local
+    subgraph Server [Servidor Local / Mac]
+        direction TB
+        CF_Daemon(Cloudflared Daemon):::server
+        
+        subgraph Apps [Aplicaciones y Servicios]
+            App1[Plane HQ<br/>localhost:8080]:::app
+            App2[MD/Mermaid Editor<br/>localhost:8081]:::app
+            App3[Dashboard Admin<br/>localhost:5080]:::app
+            App4[Nueva App<br/>localhost:8082]:::app
+        end
+    end
+
+    %% Conexiones
+    Users -->|Peticiones HTTP/S| DNS
+    DNS --> Tunnel
+    Tunnel <==>|Conexión Segura Outbound| CF_Daemon
+    
+    CF_Daemon -->|plane.masamadremonterrey.com| App1
+    CF_Daemon -->|diagram.masamadremonterrey.com| App2
+    CF_Daemon -->|dashboard.masamadremonterrey.com| App3
+    CF_Daemon -->|newapp.masamadremonterrey.com| App4

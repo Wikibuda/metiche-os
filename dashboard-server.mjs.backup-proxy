@@ -1,0 +1,552 @@
+import { createServer } from "node:http";
+import { promises as fs } from "node:fs";
+import path from "node:path";
+import os from "node:os";
+import { spawn } from "node:child_process";
+import net from "node:net";
+
+const HOME = os.homedir();
+const OPENCLAW_ROOT = path.join(HOME, ".openclaw");
+const WORKSPACE_PERSONAL = path.join(OPENCLAW_ROOT, "workspace-personal");
+const DASHBOARD_FILE = path.join(WORKSPACE_PERSONAL, "admin-dashboard.html");
+const OPENCLAW_CONFIG = path.join(OPENCLAW_ROOT, "openclaw.json");
+const PROD_LOG = path.join(OPENCLAW_ROOT, "logs", "gateway.log");
+const PROD_ERR_LOG = path.join(OPENCLAW_ROOT, "logs", "gateway.err.log");
+const PORT = Number(process.env.DASHBOARD_PORT || 5060);
+
+// Archivos de datos para dashboards
+const SHOPIFY_SALES_FILE = path.join(OPENCLAW_ROOT, "workspace", "dashboard_parts", "shopify_today_simple.json");
+const DEEPSEEK_PRICING_FILE = path.join(OPENCLAW_ROOT, "workspace", "dashboard_parts", "deepseek_pricing.json");
+
+const ACTIONS = {
+  "prod-status": { cmd: "openclaw", args: ["daemon", "status"] },
+  "prod-start": { cmd: "openclaw", args: ["daemon", "start"] },
+  "prod-stop": { cmd: "openclaw", args: ["daemon", "stop"] },
+  "prod-restart": { cmd: "openclaw", args: ["daemon", "restart"] },
+  "dev-status": { cmd: "openclaw", args: ["--profile", "dev", "daemon", "status"] },
+  "dev-start": { cmd: "openclaw", args: ["--profile", "dev", "daemon", "start"] },
+  "dev-stop": { cmd: "openclaw", args: ["--profile", "dev", "daemon", "stop"] },
+  "dev-restart": { cmd: "openclaw", args: ["--profile", "dev", "daemon", "restart"] },
+  "sakura-status": { cmd: "bash", args: [path.join(WORKSPACE_PERSONAL, "sakura-status.sh")] },
+  "sakura-start": { cmd: "bash", args: [path.join(WORKSPACE_PERSONAL, "sakura-start.sh")] },
+  "sakura-stop": { cmd: "bash", args: [path.join(WORKSPACE_PERSONAL, "sakura-stop.sh")] }
+};
+
+function sendJson(res, statusCode, payload) {
+  const body = JSON.stringify(payload);
+  res.writeHead(statusCode, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store",
+    "Content-Length": Buffer.byteLength(body)
+  });
+  res.end(body);
+}
+
+function sendHtml(res, html) {
+  res.writeHead(200, {
+    "Content-Type": "text/html; charset=utf-8",
+    "Cache-Control": "no-store"
+  });
+  res.end(html);
+}
+
+function runCommand(action, timeoutMs = 15000) {
+  const task = ACTIONS[action];
+  if (!task) {
+    return Promise.resolve({
+      ok: false,
+      action,
+      error: "Acción no permitida"
+    });
+  }
+  return new Promise((resolve) => {
+    const child = spawn(task.cmd, task.args, {
+      cwd: WORKSPACE_PERSONAL,
+      env: process.env,
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+    let stdout = "";
+    let stderr = "";
+    const timer = setTimeout(() => {
+      child.kill("SIGTERM");
+    }, timeoutMs);
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      resolve({
+        ok: code === 0,
+        action,
+        code,
+        stdout: stdout.trim(),
+        stderr: stderr.trim()
+      });
+    });
+    child.on("error", (error) => {
+      clearTimeout(timer);
+      resolve({
+        ok: false,
+        action,
+        error: error.message
+      });
+    });
+  });
+}
+
+function isWorkspacePathAllowed(workspacePath) {
+  if (typeof workspacePath !== "string" || workspacePath.length === 0) return false;
+  const normalized = path.resolve(workspacePath);
+  if (!normalized.startsWith(OPENCLAW_ROOT)) return false;
+  return path.basename(normalized).startsWith("workspace");
+}
+
+function listProcesses() {
+  return new Promise((resolve) => {
+    const child = spawn("ps", ["-axo", "pid=,command="], {
+      env: process.env,
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+    let stdout = "";
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
+    child.on("close", () => {
+      const rows = stdout
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => {
+          const firstSpace = line.indexOf(" ");
+          if (firstSpace < 1) return null;
+          const pid = Number(line.slice(0, firstSpace).trim());
+          const command = line.slice(firstSpace + 1).trim();
+          if (!Number.isInteger(pid) || !command) return null;
+          return { pid, command };
+        })
+        .filter(Boolean);
+      resolve(rows);
+    });
+    child.on("error", () => resolve([]));
+  });
+}
+
+function isAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function emergencyStopWorkspace(workspacePath) {
+  if (!isWorkspacePathAllowed(workspacePath)) {
+    return {
+      ok: false,
+      error: "Workspace inválido o fuera de alcance permitido"
+    };
+  }
+  const processes = await listProcesses();
+  const normalizedWorkspace = path.resolve(workspacePath);
+  const includeRegex = /\b(openclaw|node|python|bun|deno|npm|pnpm|tsx|uvicorn|gunicorn)\b/i;
+  const candidates = processes.filter((proc) => {
+    if (proc.pid === process.pid) return false;
+    if (!proc.command.includes(normalizedWorkspace)) return false;
+    if (!includeRegex.test(proc.command)) return false;
+    if (proc.command.includes("dashboard-server.mjs")) return false;
+    if (proc.command.includes("openclaw gateway run")) return false;
+    if (proc.command.includes("openclaw daemon")) return false;
+    if (proc.command.includes("curl ")) return false;
+    if (proc.command.includes("trae-sandbox")) return false;
+    if (proc.command.includes("CheckCommandStatus")) return false;
+    return true;
+  });
+
+  const terminated = [];
+  const forced = [];
+  for (const proc of candidates) {
+    try {
+      process.kill(proc.pid, "SIGTERM");
+      terminated.push(proc);
+    } catch {}
+  }
+  await sleep(450);
+  for (const proc of terminated) {
+    if (!isAlive(proc.pid)) continue;
+    try {
+      process.kill(proc.pid, "SIGKILL");
+      forced.push(proc.pid);
+    } catch {}
+  }
+
+  const finalDead = terminated.filter((proc) => !isAlive(proc.pid));
+  const finalAlive = terminated.filter((proc) => isAlive(proc.pid));
+  return {
+    ok: true,
+    workspace: normalizedWorkspace,
+    matched: candidates.length,
+    terminated: finalDead.length,
+    forced: forced.length,
+    stillAlive: finalAlive.length,
+    sample: candidates.slice(0, 6).map((proc) => ({
+      pid: proc.pid,
+      command: proc.command.slice(0, 180)
+    }))
+  };
+}
+
+async function safeReadJson(filePath) {
+  try {
+    const content = await fs.readFile(filePath, "utf-8");
+    return JSON.parse(content);
+  } catch {
+    return null;
+  }
+}
+async function shopifyProxy(req) {
+  const SHOPIFY_TOKEN_PATH = path.join(OPENCLAW_ROOT, "workspace-masa-madre", "shopify_token.json");
+  const SHOPIFY_STORE = "masamadremonterrey.myshopify.com";
+  const SHOPIFY_API_VERSION = "2025-10";
+  
+  try {
+    // Leer token Shopify
+    const tokenData = await safeReadJson(SHOPIFY_TOKEN_PATH);
+    if (!tokenData || !tokenData.access_token) {
+      return { ok: false, error: "Token Shopify no disponible" };
+    }
+    const token = tokenData.access_token;
+    
+    // Parsear query parameters
+    const requestUrl = new URL(req.url, \`http://\${req.headers.host || "localhost"}\`);
+    const shopifyPath = requestUrl.searchParams.get("path") || "/admin/api/2025-10/products.json";
+    const fullUrl = \`https://\${SHOPIFY_STORE}\${shopifyPath}\`;
+    
+    // Determinar método HTTP
+    const method = req.method || "GET";
+    
+    // Headers para Shopify
+    const headers = {
+      "X-Shopify-Access-Token": token,
+      "Content-Type": "application/json",
+      "Accept": "application/json"
+    };
+    
+    // Recoger body si existe
+    let body = null;
+    if (method === "POST" || method === "PUT") {
+      const chunks = [];
+      for await (const chunk of req) {
+        chunks.push(chunk);
+      }
+      if (chunks.length > 0) {
+        body = Buffer.concat(chunks).toString("utf-8");
+      }
+    }
+    
+    // Realizar request a Shopify
+    const response = await fetch(fullUrl, {
+      method,
+      headers,
+      body
+    });
+    
+    const responseText = await response.text();
+    
+    return {
+      ok: response.ok,
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries()),
+      body: responseText,
+      url: fullUrl
+    };
+    
+  } catch (error) {
+    return {
+      ok: false,
+      error: error.message,
+      stack: error.stack
+    };
+  }
+}
+
+
+function checkPort(port) {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    let finished = false;
+    const finish = (open) => {
+      if (finished) return;
+      finished = true;
+      socket.destroy();
+      resolve(open);
+    };
+    socket.setTimeout(750);
+    socket.once("connect", () => finish(true));
+    socket.once("timeout", () => finish(false));
+    socket.once("error", () => finish(false));
+    socket.connect(port, "127.0.0.1");
+  });
+}
+
+function formatDate(value) {
+  if (!value) return "N/A";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "N/A";
+  return d.toISOString();
+}
+
+async function collectTreeStats(rootDir, maxEntries = 4000) {
+  let files = 0;
+  let directories = 0;
+  let newest = 0;
+  const stack = [rootDir];
+  let scanned = 0;
+  while (stack.length > 0 && scanned < maxEntries) {
+    const current = stack.pop();
+    let entries = [];
+    try {
+      entries = await fs.readdir(current, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      if (entry.name.startsWith(".git")) continue;
+      const fullPath = path.join(current, entry.name);
+      scanned += 1;
+      if (scanned > maxEntries) break;
+      let stat;
+      try {
+        stat = await fs.stat(fullPath);
+      } catch {
+        continue;
+      }
+      if (stat.mtimeMs > newest) newest = stat.mtimeMs;
+      if (entry.isDirectory()) {
+        directories += 1;
+        stack.push(fullPath);
+      } else {
+        files += 1;
+      }
+    }
+  }
+  return { files, directories, newest, scanned, capped: scanned >= maxEntries };
+}
+
+async function readTail(filePath, maxLines = 60) {
+  try {
+    const content = await fs.readFile(filePath, "utf-8");
+    const lines = content.split("\n");
+    return lines.slice(Math.max(0, lines.length - maxLines)).join("\n");
+  } catch {
+    return "";
+  }
+}
+
+async function buildOverview() {
+  const config = await safeReadJson(OPENCLAW_CONFIG);
+  const agents = Array.isArray(config?.agents?.list) ? config.agents.list : [];
+  const workspaceMap = new Map();
+  for (const agent of agents) {
+    if (!agent?.workspace) continue;
+    if (!workspaceMap.has(agent.workspace)) {
+      workspaceMap.set(agent.workspace, []);
+    }
+    workspaceMap.get(agent.workspace).push({
+      id: agent.id || "sin-id",
+      name: agent.name || agent.id || "sin-nombre",
+      model: agent.model || "sin-modelo"
+    });
+  }
+
+  const rootEntries = await fs.readdir(OPENCLAW_ROOT, { withFileTypes: true });
+  const workspaceDirs = rootEntries
+    .filter((entry) => entry.isDirectory() && entry.name.startsWith("workspace"))
+    .map((entry) => path.join(OPENCLAW_ROOT, entry.name));
+
+  const workspaceRows = [];
+  let totalMemoryNotes = 0;
+  for (const workspacePath of workspaceDirs) {
+    const stats = await collectTreeStats(workspacePath);
+    const memoryDir = path.join(workspacePath, "memory");
+    let memoryNotes = 0;
+    try {
+      const memoryEntries = await fs.readdir(memoryDir, { withFileTypes: true });
+      memoryNotes = memoryEntries.filter((entry) => entry.isFile() && entry.name.endsWith(".md")).length;
+    } catch {
+      memoryNotes = 0;
+    }
+    totalMemoryNotes += memoryNotes;
+    const attachedAgents = workspaceMap.get(workspacePath) || [];
+    workspaceRows.push({
+      name: path.basename(workspacePath),
+      path: workspacePath,
+      files: stats.files,
+      directories: stats.directories,
+      lastUpdate: formatDate(stats.newest),
+      memoryNotes,
+      scopedAgents: attachedAgents,
+      scannedEntries: stats.scanned,
+      scanCapped: stats.capped
+    });
+  }
+
+  workspaceRows.sort((a, b) => a.name.localeCompare(b.name, "es"));
+
+  const prodGatewayOpen = await checkPort(18789);
+  const prodLogTail = await readTail(PROD_LOG);
+  const prodErrLogTail = await readTail(PROD_ERR_LOG, 40);
+
+  return {
+    generatedAt: new Date().toISOString(),
+    summary: {
+      totalWorkspaces: workspaceRows.length,
+      totalAgents: agents.length,
+      totalMemoryNotes,
+      activeGateways: prodGatewayOpen ? 1 : 0
+    },
+    gateways: {
+      prod: { label: "Producción", port: 18789, online: prodGatewayOpen }
+    },
+    workspaces: workspaceRows,
+    logs: {
+      prod: prodLogTail,
+      prodErr: prodErrLogTail
+    }
+  };
+}
+
+async function parseRequestBody(req) {
+  const chunks = [];
+  for await (const chunk of req) {
+    chunks.push(chunk);
+  }
+  if (chunks.length === 0) return {};
+  const body = Buffer.concat(chunks).toString("utf-8");
+  try {
+    return JSON.parse(body);
+  } catch {
+    return {};
+  }
+}
+
+const server = createServer(async (req, res) => {
+  try {
+    const requestUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+    console.log(`📡 Request: ${req.method} ${requestUrl.pathname} (host: ${req.headers.host})`);
+
+    if (req.method === "GET" && (requestUrl.pathname === "/" || requestUrl.pathname === "/admin-dashboard.html")) {
+      const html = await fs.readFile(DASHBOARD_FILE, "utf-8");
+      sendHtml(res, html);
+      return;
+    }
+
+    if (req.method === "GET" && requestUrl.pathname === "/api/overview") {
+      const overview = await buildOverview();
+      sendJson(res, 200, overview);
+      return;
+    }
+
+    if (req.method === "POST" && requestUrl.pathname === "/api/action") {
+      const body = await parseRequestBody(req);
+      const action = typeof body.action === "string" ? body.action : "";
+      const result = await runCommand(action);
+      sendJson(res, result.ok ? 200 : 400, result);
+      return;
+    }
+
+    if (req.method === "POST" && requestUrl.pathname === "/api/workspace/emergency-stop") {
+      const body = await parseRequestBody(req);
+      const workspacePath = typeof body.workspacePath === "string" ? body.workspacePath : "";
+      const result = await emergencyStopWorkspace(workspacePath);
+      sendJson(res, result.ok ? 200 : 400, result);
+      return;
+    }
+
+    if (req.method === "GET" && requestUrl.pathname === "/health") {
+      sendJson(res, 200, { ok: true, service: "workspace-personal-dashboard" });
+      return;
+    }
+
+    if (req.method === "GET" && requestUrl.pathname === "/api/shopify/today-sales") {
+      try {
+        const data = await fs.readFile(SHOPIFY_SALES_FILE, "utf-8");
+        const jsonData = JSON.parse(data);
+        sendJson(res, 200, jsonData);
+      } catch (error) {
+        sendJson(res, 500, { ok: false, error: "No se pudieron cargar las ventas de Shopify" });
+      }
+      return;
+    }
+
+    if (req.method === "GET" && requestUrl.pathname === "/api/deepseek/pricing") {
+      try {
+        // Datos de pricing de DeepSeek API (actualizados manualmente)
+        const pricingData = {
+          "model_prices": {
+            "deepseek-reasoner": {
+              "input_per_million_tokens": 0.80,
+              "output_per_million_tokens": 3.20,
+              "currency": "USD"
+            },
+            "deepseek-chat": {
+              "input_per_million_tokens": 0.14,
+              "output_per_million_tokens": 0.56,
+              "currency": "USD"
+            }
+          },
+          "last_updated": "2026-03-23T13:30:00Z",
+          "source": "DeepSeek API Pricing Documentation"
+        };
+        sendJson(res, 200, pricingData);
+      }
+    if (req.method === "GET" && requestUrl.pathname === "/api/shopify-proxy") {
+      const proxyResult = await shopifyProxy(req);
+      if (proxyResult.ok) {
+        // Devolver respuesta de Shopify tal cual
+        const headers = {
+          "Content-Type": proxyResult.headers["content-type"] || "application/json",
+          "Cache-Control": "no-store"
+        };
+        res.writeHead(proxyResult.status || 200, headers);
+        res.end(proxyResult.body);
+      } else {
+        sendJson(res, 500, proxyResult);
+      }
+      return;
+    }
+ catch (error) {
+        sendJson(res, 500, { ok: false, error: "Error cargando pricing" });
+      }
+      return;
+    }
+
+    if (req.method === "GET" && requestUrl.pathname === "/") {
+      try {
+        const html = await fs.readFile(DASHBOARD_FILE, "utf-8");
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        res.end(html);
+        return;
+      } catch (error) {
+        sendJson(res, 500, { ok: false, error: "No se pudo cargar el dashboard" });
+        return;
+      }
+    }
+
+    sendJson(res, 404, { ok: false, error: "Ruta no encontrada" });
+  } catch (error) {
+    sendJson(res, 500, { ok: false, error: error.message });
+  }
+});
+
+server.listen(PORT, () => {
+  process.stdout.write(`Dashboard operativo en puerto ${PORT}\n`);
+});
