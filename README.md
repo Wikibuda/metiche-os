@@ -75,6 +75,32 @@ ln -s ~/ruta/a/tu/proyecto nombre-del-proyecto
 - **Datos:** `~/.openclaw-personal` (completamente separado)
 - **Plugins habilitados:** files, web, calendar, exec (limitado)
 
+## 🧪 Dashboard Lab (metiche-os)
+
+- **Interfaz Lab:** `http://127.0.0.1:5063/lab`
+- **Alias válidos:** `http://127.0.0.1:5063/` y `http://127.0.0.1:5063/admin-dashboard.html`
+- **Archivo UI:** `~/.openclaw/workspace-personal/admin-dashboard-lab.html`
+- **Servidor:** `~/.openclaw/workspace-personal/dashboard-server.mjs`
+- **Swagger metiche-os (API docs):** `http://127.0.0.1:8091/docs`
+- **OpenAPI JSON:** `http://127.0.0.1:8091/openapi.json`
+
+### Endpoints usados por el dashboard lab
+
+- `GET /api/labs/metiche-os/overview`
+- `GET /api/labs/metiche-os/task-detail?taskId=<uuid>`
+- `GET /health` (dashboard server)
+
+### Checklist mínimo antes de tag release
+
+1. `curl http://127.0.0.1:8091/health` devuelve `200`.
+2. `curl http://127.0.0.1:5063/api/labs/metiche-os/overview` devuelve `200`.
+3. `task-detail` responde `200` con un `task_id` real de `recent_tasks`.
+4. Verificar UI manual en `/lab`:
+   - carga overview,
+   - detalle legible (no solo JSON),
+   - alertas de error visibles,
+   - auto-refresh activo.
+
 ## 🎯 Propósito
 
 Este gateway es para:
