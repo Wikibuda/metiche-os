@@ -7,4 +7,4 @@ PORT="${DASHBOARD_PORT:-5063}"
 echo "Iniciando dashboard en http://127.0.0.1:${PORT}/admin-dashboard.html"
 
 cd "${ROOT_DIR}"
-exec env DASHBOARD_PORT="${PORT}" node dashboard/dashboard-static.mjs
+exec env DASHBOARD_PORT="${PORT}" node dashboard/dashboard-server.mjs
