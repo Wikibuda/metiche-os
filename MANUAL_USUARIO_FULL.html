@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Manual de Usuario y Operacion - metiche-os (Full)</title>
+  <style>
+    :root { --bg:#0b1020; --card:#121a33; --text:#e8ecff; --muted:#b7c0e6; --accent:#7aa2ff; --ok:#4cd97b; --warn:#ffd166; --bad:#ff6b6b; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; background:var(--bg); color:var(--text); line-height:1.55; }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 28px 18px 60px; }
+    .hero { background: linear-gradient(145deg,#121a33,#0f1630); border:1px solid #253056; border-radius: 14px; padding: 20px; margin-bottom: 18px; }
+    h1,h2,h3 { line-height: 1.25; margin: 0 0 10px; }
+    h1 { font-size: 30px; }
+    h2 { margin-top: 26px; font-size: 22px; border-left:4px solid var(--accent); padding-left:10px; }
+    h3 { margin-top: 18px; font-size: 18px; color:#d6defd; }
+    p,li { color: var(--muted); }
+    ul,ol { margin-top: 8px; }
+    code { background:#1b2446; color:#dbe4ff; padding:2px 6px; border-radius:6px; border:1px solid #2a3566; }
+    .card { background: var(--card); border:1px solid #253056; border-radius: 12px; padding: 16px; margin: 14px 0; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit,minmax(230px,1fr)); gap: 10px; }
+    .kpi { background:#161f3c; border:1px solid #2b3768; border-radius:10px; padding:12px; }
+    .ok { color: var(--ok); }
+    .warn { color: var(--warn); }
+    .bad { color: var(--bad); }
+    .footer { margin-top: 34px; font-size: 13px; color:#98a7de; }
+    a { color:#a9bfff; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <h1>Manual de Usuario y Operacion - metiche-os</h1>
+      <p>Guia completa para operar, extender y mantener <code>metiche-os</code>. Documento autocontenido para uso diario, onboarding y trabajo tecnico.</p>
+      <div class="grid">
+        <div class="kpi"><strong>Perfil</strong><br>Operaciones + Dev</div>
+        <div class="kpi"><strong>Alcance</strong><br>CLI, API, validadores, bitacora</div>
+        <div class="kpi"><strong>Estado</strong><br><span class="ok">Fase 4 activa</span></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>1) Objetivo del sistema</h2>
+      <ul>
+        <li>Ejecucion de tareas con ruteo y validacion por canal.</li>
+        <li>Sincronizacion de fallas de validacion hacia Plane (si esta habilitado).</li>
+        <li>Narrativa operacional: cronicas, resumenes, momentos y candidatos.</li>
+        <li>Proyeccion de bitacora en Markdown para lectura humana.</li>
+      </ul>
+      <ol>
+        <li>Se crea/ejecuta una tarea.</li>
+        <li>Se decide ruta y se registra ejecucion.</li>
+        <li>Se valida por canal y se emiten <code>validation_attempt</code>.</li>
+        <li>El selector narrativo promueve eventos a cronicas.</li>
+        <li>Se exporta bitacora a archivo Markdown.</li>
+      </ol>
+    </section>
+
+    <section class="card">
+      <h2>2) Arquitectura por modulos</h2>
+      <ul>
+        <li><code>app/main.py</code>: inicializa FastAPI y routers.</li>
+        <li><code>app/api/</code>: endpoints HTTP.</li>
+        <li><code>app/cli/</code>: comandos de operacion.</li>
+        <li><code>app/core/</code>: config y base de datos.</li>
+        <li><code>app/domain/tasks/</code>: flujo de tareas.</li>
+        <li><code>app/domain/validators/</code>: validadores por canal.</li>
+        <li><code>app/domain/narrative/</code>: selector y servicio narrativo.</li>
+        <li><code>app/integrations/plane.py</code>: cliente Plane.</li>
+        <li><code>app/projections/bitacora.py</code>: export markdown.</li>
+      </ul>
+      <p>Flujo de datos: <code>Task -&gt; Decision -&gt; Execution -&gt; Validation</code>, eventos en <code>task_events</code>, promocion <code>narrative_candidates -&gt; narrativeentry</code>.</p>
+    </section>
+
+    <section class="card">
+      <h2>3) Configuracion y entorno</h2>
+      <h3>Prioridad de .env</h3>
+      <ol>
+        <li><code>/Users/gusluna/.openclaw/workspace/.env</code></li>
+        <li><code>.env</code></li>
+        <li><code>/Users/gusluna/.openclaw/.env</code></li>
+      </ol>
+      <h3>Variables clave</h3>
+      <ul>
+        <li>Base: <code>METICHE_ENV</code>, <code>DATABASE_URL</code>, <code>PROJECTIONS_ROOT</code>, <code>PLANE_SYNC_ENABLED</code>.</li>
+        <li>Plane: <code>PLANE_BASE_URL</code>/<code>PLANE_API_URL</code>, <code>PLANE_WORKSPACE_SLUG</code>, <code>PLANE_PROJECT_ID</code>, <code>PLANE_API_KEY</code>/<code>PLANE_API_TOKEN</code>.</li>
+        <li>WhatsApp: <code>OPENCLAW_GATEWAY_URL</code> (default <code>http://127.0.0.1:18797</code>).</li>
+        <li>Telegram: <code>TELEGRAM_BOT_TOKEN</code> + <code>TELEGRAM_CHAT_ID</code> (o fallback metadata).</li>
+        <li>Shopify: <code>SHOPIFY_STORE_DOMAIN</code>/<code>SHOPIFY_STORE_URL</code>, <code>SHOPIFY_ACCESS_TOKEN</code>.</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>4) Comandos CLI</h2>
+      <p>Se pueden ejecutar como <code>metiche ...</code> o <code>python -m app.cli.main ...</code>.</p>
+      <ul>
+        <li><code>metiche init-db</code></li>
+        <li><code>metiche run --task "titulo" --task-type whatsapp --description "detalle"</code></li>
+        <li><code>metiche validate --task-id &lt;task_id&gt;</code></li>
+        <li><code>metiche narrator-tick --limite 100</code></li>
+        <li><code>metiche --cuentame --limite 5</code></li>
+        <li><code>metiche resumen-diario --dia 2026-04-08</code></li>
+        <li><code>metiche build-bitacora</code></li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>5) API HTTP (resumen)</h2>
+      <ul>
+        <li><code>GET /health</code></li>
+        <li><code>POST /tasks/run</code></li>
+        <li><code>GET /tasks/{task_id}/flow</code></li>
+        <li><code>POST /tasks/enqueue</code>, <code>POST /tasks/process-next</code></li>
+        <li><code>GET /tasks/overview</code></li>
+        <li><code>POST /narrative</code>, <code>GET /narrative</code></li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>6) Validadores por canal</h2>
+      <p>Implementados: Telegram, WhatsApp, Dashboard, Shopify y Deepseek.</p>
+      <ul>
+        <li>Los canales requeridos se resuelven por <code>task_type</code>, marcador en descripcion <code>[channels=...]</code> y <code>VALIDATION_REQUIRED_CHANNELS</code>.</li>
+        <li>Cada validador retorna <code>ValidationResult</code>.</li>
+        <li>Cada resultado emite <code>task_event</code> tipo <code>validation_attempt</code>.</li>
+      </ul>
+      <h3>WhatsApp (Fase 4)</h3>
+      <ol>
+        <li>Health gateway: <code>GET {OPENCLAW_GATEWAY_URL}/health</code> con timeout 5s.</li>
+        <li>Canal habilitado: <code>openclaw channels list | grep -q "WhatsApp default: linked, enabled"</code>.</li>
+      </ol>
+      <p>Solo pasa si ambos checks son exitosos. Tiene cache TTL de 60s.</p>
+    </section>
+
+    <section class="card">
+      <h2>7) Como agregar un nuevo validador</h2>
+      <ol>
+        <li>Crear <code>app/domain/validators/mi_canal_validator.py</code>.</li>
+        <li>Heredar de <code>BaseValidator</code> e implementar <code>validate(...)</code>.</li>
+        <li>Retornar <code>ValidationResult</code> consistente.</li>
+        <li>Exportar en <code>app/domain/validators/__init__.py</code>.</li>
+        <li>Registrar en <code>_validator_registry()</code>.</li>
+        <li>Mapear <code>task_type -&gt; canal</code> en <code>_resolve_required_channels(...)</code>.</li>
+        <li>Probar con <code>run</code>, <code>validate</code>, <code>narrator-tick</code> y <code>--cuentame</code>.</li>
+      </ol>
+    </section>
+
+    <section class="card">
+      <h2>8) Bitacora y narrativa</h2>
+      <ol>
+        <li>Ejecutar tareas.</li>
+        <li>Correr selector: <code>metiche narrator-tick --limite 100</code>.</li>
+        <li>Revisar: <code>metiche --cuentame --limite 10</code>.</li>
+        <li>Exportar: <code>metiche build-bitacora</code>.</li>
+      </ol>
+      <p>Ruta de salida: <code>projections/bitacora/bitacora_de_asombros.md</code>.</p>
+      <p>Escala de asombro en validaciones: <span class="bad">5</span> (falla critica), <span class="ok">4</span> (exito), <span class="warn">3</span> (informativo/no critico).</p>
+    </section>
+
+    <section class="card">
+      <h2>9) Plane</h2>
+      <p>Si <code>PLANE_SYNC_ENABLED=true</code> y hay fallas de validacion:</p>
+      <ul>
+        <li>Se crea issue.</li>
+        <li>Se comenta resumen de canales fallidos.</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>10) Troubleshooting</h2>
+      <ul>
+        <li>Credenciales faltantes: revisar <code>~/.openclaw/workspace/.env</code>.</li>
+        <li>WhatsApp no conecta: validar <code>OPENCLAW_GATEWAY_URL</code> y probar <code>curl http://127.0.0.1:18797/health</code>.</li>
+        <li>No hay cronicas: correr <code>metiche narrator-tick --limite 100</code>.</li>
+        <li>DB inaccesible: revisar <code>DATABASE_URL</code> absoluta y permisos.</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>11) Checklist operativo</h2>
+      <h3>Diario</h3>
+      <ol>
+        <li><code>metiche run ...</code></li>
+        <li><code>metiche validate --task-id ...</code></li>
+        <li><code>metiche narrator-tick --limite 100</code></li>
+        <li><code>metiche --cuentame --limite 5</code></li>
+        <li><code>metiche build-bitacora</code></li>
+      </ol>
+      <h3>Semanal</h3>
+      <ol>
+        <li>Revisar resumenes diarios.</li>
+        <li>Verificar salud de validadores por canal.</li>
+        <li>Confirmar sincronizacion con Plane.</li>
+      </ol>
+    </section>
+
+    <p class="footer">Fuente base: <code>MANUAL_USUARIO.md</code> | Version HTML autocontenida.</p>
+  </div>
+</body>
+</html>
