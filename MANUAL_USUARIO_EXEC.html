@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Manual Ejecutivo - metiche-os</title>
+  <style>
+    body { margin:0; background:#0f1220; color:#f1f3ff; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; }
+    .wrap { max-width: 900px; margin: 0 auto; padding: 26px 18px 52px; }
+    h1,h2 { margin:0 0 10px; line-height:1.25; }
+    h1 { font-size: 30px; }
+    h2 { font-size: 20px; margin-top: 22px; color:#cbd5ff; }
+    .box { background:#171b2f; border:1px solid #2a3158; border-radius:12px; padding:14px 16px; margin:12px 0; }
+    code { background:#252d53; border:1px solid #3b467d; border-radius:6px; padding:2px 6px; color:#dfe6ff; }
+    ul,ol,p { color:#d0d6f7; line-height:1.55; }
+    .pill { display:inline-block; padding:4px 8px; border-radius:999px; border:1px solid #40508e; margin-right:6px; font-size:12px; color:#cfdaff; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Manual Ejecutivo - metiche-os</h1>
+    <p>Version corta para operacion y onboarding rapido.</p>
+    <p><span class="pill">Fase 4</span><span class="pill">Multicanal</span><span class="pill">Narrativa</span><span class="pill">Plane</span></p>
+
+    <section class="box">
+      <h2>Que hace el sistema</h2>
+      <ol>
+        <li>Ejecuta tareas y decide ruta.</li>
+        <li>Valida por canal (Telegram, WhatsApp, Shopify, Dashboard, Deepseek).</li>
+        <li>Registra eventos narrativos y genera cronicas.</li>
+        <li>Sincroniza fallas a Plane cuando esta habilitado.</li>
+      </ol>
+    </section>
+
+    <section class="box">
+      <h2>Comandos minimos (dia a dia)</h2>
+      <ul>
+        <li><code>metiche run --task "..." --task-type whatsapp --description "..."</code></li>
+        <li><code>metiche validate --task-id &lt;task_id&gt;</code></li>
+        <li><code>metiche narrator-tick --limite 100</code></li>
+        <li><code>metiche --cuentame --limite 5</code></li>
+        <li><code>metiche build-bitacora</code></li>
+      </ul>
+    </section>
+
+    <section class="box">
+      <h2>Variables criticas</h2>
+      <ul>
+        <li><code>DATABASE_URL</code></li>
+        <li><code>OPENCLAW_GATEWAY_URL</code> (default <code>http://127.0.0.1:18797</code>)</li>
+        <li><code>PLANE_SYNC_ENABLED</code></li>
+        <li>Credenciales de canal (Telegram, Shopify, etc)</li>
+      </ul>
+      <p>Prioridad de .env: <code>~/.openclaw/workspace/.env</code> -&gt; <code>.env</code> -&gt; <code>~/.openclaw/.env</code>.</p>
+    </section>
+
+    <section class="box">
+      <h2>WhatsApp (check completo)</h2>
+      <ol>
+        <li>Gateway: <code>GET {OPENCLAW_GATEWAY_URL}/health</code> debe devolver <code>ok=true</code> o <code>status=live</code>.</li>
+        <li>Canal: <code>openclaw channels list | grep -q "WhatsApp default: linked, enabled"</code> debe retornar 0.</li>
+      </ol>
+      <p>Ambos checks son obligatorios para estado <code>passed</code>.</p>
+    </section>
+
+    <section class="box">
+      <h2>Escala de asombro</h2>
+      <ul>
+        <li><code>5</code>: falla critica</li>
+        <li><code>4</code>: validacion exitosa</li>
+        <li><code>3</code>: informativo/no critico</li>
+      </ul>
+    </section>
+
+    <section class="box">
+      <h2>Cuando algo falla</h2>
+      <ul>
+        <li>Revisar variables en <code>~/.openclaw/workspace/.env</code>.</li>
+        <li>Probar gateway: <code>curl http://127.0.0.1:18797/health</code>.</li>
+        <li>Verificar canal: <code>openclaw channels list</code>.</li>
+        <li>Re-ejecutar: <code>validate</code> y luego <code>narrator-tick</code>.</li>
+      </ul>
+    </section>
+
+    <section class="box">
+      <h2>Extender con nuevo validador</h2>
+      <ol>
+        <li>Crear clase en <code>app/domain/validators/</code> heredando <code>BaseValidator</code>.</li>
+        <li>Registrar en <code>__init__.py</code> y en <code>_validator_registry()</code>.</li>
+        <li>Mapear <code>task_type</code> en <code>_resolve_required_channels(...)</code>.</li>
+        <li>Probar flujo completo y documentar variables.</li>
+      </ol>
+    </section>
+  </div>
+</body>
+</html>
