@@ -303,8 +303,13 @@ Proyección de bitácora:
 ### Levantar API
 
 ```bash
-uvicorn app.main:app --reload --port 8000
+./scripts/run-api-8091.sh
 ```
+
+Documentacion Swagger:
+
+- `http://127.0.0.1:8091/docs`
+- `http://127.0.0.1:8091/openapi.json`
 
 ### Endpoints principales
 
@@ -322,11 +327,11 @@ uvicorn app.main:app --reload --port 8000
 ### Ejemplos curl
 
 ```bash
-curl -s http://127.0.0.1:8000/health | jq
+curl -s http://127.0.0.1:8091/health | jq
 ```
 
 ```bash
-curl -s -X POST http://127.0.0.1:8000/tasks/run \
+curl -s -X POST http://127.0.0.1:8091/tasks/run \
   -H "Content-Type: application/json" \
   -d '{
     "title": "probar validador shopify",
@@ -337,7 +342,7 @@ curl -s -X POST http://127.0.0.1:8000/tasks/run \
 ```
 
 ```bash
-curl -s http://127.0.0.1:8000/tasks/<task_id>/flow | jq
+curl -s http://127.0.0.1:8091/tasks/<task_id>/flow | jq
 ```
 
 ## Integración con Plane
