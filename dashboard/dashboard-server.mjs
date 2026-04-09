@@ -4,11 +4,14 @@ import path from "node:path";
 import os from "node:os";
 import { spawn } from "node:child_process";
 import net from "node:net";
+import { fileURLToPath } from "node:url";
 
 const HOME = os.homedir();
 const OPENCLAW_ROOT = path.join(HOME, ".openclaw");
 const WORKSPACE_PERSONAL = path.join(OPENCLAW_ROOT, "workspace-personal");
-const DASHBOARD_FILE = path.join(WORKSPACE_PERSONAL, "admin-dashboard-lab.html");
+const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
+const DASHBOARD_FILE = process.env.DASHBOARD_FILE || path.join(MODULE_DIR, "operativo.html");
+const LEGACY_DASHBOARD_FILE = path.join(WORKSPACE_PERSONAL, "admin-dashboard-lab.html");
 const OPENCLAW_CONFIG = path.join(OPENCLAW_ROOT, "openclaw.json");
 const PROD_LOG = path.join(OPENCLAW_ROOT, "logs", "gateway.log");
 const PROD_ERR_LOG = path.join(OPENCLAW_ROOT, "logs", "gateway.err.log");
@@ -709,6 +712,44 @@ async function parseRequestBody(req) {
   }
 }
 
+async function loadDashboardHtml() {
+  try {
+    return await fs.readFile(DASHBOARD_FILE, "utf-8");
+  } catch {
+    return await fs.readFile(LEGACY_DASHBOARD_FILE, "utf-8");
+  }
+}
+
+async function proxyDashboardApi(req, res, requestUrl) {
+  const upstreamUrl = `${METICHE_OS_BASE}${requestUrl.pathname}${requestUrl.search}`;
+  const method = req.method || "GET";
+  const headers = { Accept: "application/json" };
+  let body = undefined;
+
+  if (method !== "GET" && method !== "HEAD") {
+    headers["Content-Type"] = "application/json";
+    const parsedBody = await parseRequestBody(req);
+    body = JSON.stringify(parsedBody || {});
+  }
+
+  try {
+    const upstream = await fetch(upstreamUrl, { method, headers, body });
+    const contentType = upstream.headers.get("content-type") || "application/json; charset=utf-8";
+    const text = await upstream.text();
+    res.writeHead(upstream.status, {
+      "Content-Type": contentType,
+      "Cache-Control": "no-store"
+    });
+    res.end(text);
+  } catch (error) {
+    sendJson(res, 502, {
+      ok: false,
+      error: "No se pudo conectar con API de metiche-os",
+      detail: error.message
+    });
+  }
+}
+
 const server = createServer(async (req, res) => {
   try {
     const requestUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
@@ -716,10 +757,23 @@ const server = createServer(async (req, res) => {
 
     if (
       req.method === "GET" &&
-      (requestUrl.pathname === "/" || requestUrl.pathname === "/lab" || requestUrl.pathname === "/admin-dashboard.html")
+      (
+        requestUrl.pathname === "/" ||
+        requestUrl.pathname === "/lab" ||
+        requestUrl.pathname === "/admin-dashboard.html" ||
+        requestUrl.pathname === "/operativo.html"
+      )
     ) {
-      const html = await fs.readFile(DASHBOARD_FILE, "utf-8");
+      const html = await loadDashboardHtml();
       sendHtml(res, html);
+      return;
+    }
+
+    if (
+      (req.method === "GET" || req.method === "POST") &&
+      requestUrl.pathname.startsWith("/dashboard/")
+    ) {
+      await proxyDashboardApi(req, res, requestUrl);
       return;
     }
 
@@ -883,7 +937,7 @@ const server = createServer(async (req, res) => {
 
     if (req.method === "GET" && requestUrl.pathname === "/") {
       try {
-        const html = await fs.readFile(DASHBOARD_FILE, "utf-8");
+        const html = await loadDashboardHtml();
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
         res.end(html);
         return;
