@@ -49,37 +49,89 @@ El siguiente diagrama representa la arquitectura de referencia (visión operativ
 ```mermaid
 graph TD
   A[Jefe Gus] --> B[Metiche Coordinador]
-  B --> C{Ejecucion inmediata}
-  C -->|si| D[Lanzar Enjambres]
-  C -->|no| E[Cola FIFO Ejecutiva]
-  E --> C
+  A --> C[Plane Notifier Bot]
+  C --> B
 
-  D --> F[Trabajo Background]
-  F --> G[Enjambre Dashboard]
-  F --> H[Enjambre WhatsApp]
-  F --> I[Enjambre Shopify]
-  F --> J[Enjambre DeepSeek]
-  F --> K[Enjambre Plane]
+  B --> D{Ejecucion inmediata}
+  D --> E[Lanzar Enjambres]
+  D --> F[Cola FIFO Ejecutiva]
+  F --> D
 
-  G --> L[Validacion Automatica]
-  H --> L
-  I --> L
-  J --> L
-  K --> L
+  subgraph COLA[Cola FIFO Ejecutiva]
+    direction TB
+    F1[En progreso]
+    F2[Blocking]
+    F3[Urgent]
+    F4[High]
+    F5[Medium]
+    F6[Low]
+    F1 --> F2 --> F3 --> F4 --> F5 --> F6
+  end
 
-  L --> M[Reporte Unico Final]
-  M --> N[Entrega al Jefe]
+  F --> F1
+  E --> G[Trabajo Background]
 
-  B --> O[Sistema Narrativo]
-  O --> P[task_events]
-  O --> Q[narrative_candidates]
-  O --> R[narrative_entries]
+  subgraph ENJAMBRES[Enjambres Especializados]
+    direction LR
+    G1[Dashboard]
+    G2[WhatsApp]
+    G3[Shopify]
+    G4[DeepSeek]
+    G5[Plane]
+    G6[Control Ingresos Egresos]
+  end
 
-  B --> S[Integracion Plane]
-  S --> T[Issue y Comentario]
+  G --> G1
+  G --> G2
+  G --> G3
+  G --> G4
+  G --> G5
+  G --> G6
 
-  B --> U[Dashboard]
-  U --> V[dashboard/admin-dashboard-lab.html]
+  G1 --> H[Validacion automatica]
+  G2 --> H
+  G3 --> H
+  G4 --> H
+  G5 --> H
+  G6 --> H
+
+  H --> I[Reporte unico final]
+  I --> J[Entrega al jefe]
+
+  subgraph NARRATIVA[Sistema Narrativo]
+    direction TB
+    N1[task_events]
+    N2[narrative_candidates]
+    N3[narrative_entries]
+  end
+
+  B --> N1
+  N1 --> N2 --> N3
+  N3 --> I
+
+  subgraph PLANE[Integracion Plane]
+    direction TB
+    P1[plane_db_helper.py]
+    P2[plane_keeper.py]
+    P3[plane_monitor.py]
+    P4[Issue y comentario]
+  end
+
+  B --> P1
+  P1 --> P2 --> P3 --> P4
+  H --> P4
+
+  subgraph DASHBOARD[Dashboard]
+    direction TB
+    D1[dashboard/admin-dashboard-lab.html]
+    D2[dashboard/dashboard-server.mjs]
+  end
+
+  B --> D1
+  D1 --> D2
+
+  K[Bitacora Markdown] --> I
+  B --> K
 ```
 
 ### Capas arquitectónicas (estado actual)
