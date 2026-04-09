@@ -69,7 +69,7 @@ graph TD
  
  %% === DECISIÓN DE COLA === 
  B --> D0{"🎯 ¿Orden explícita ejecución inmediata?"} 
- D0 -->|✅ Sí (Gus dice expresamente)| C{"🎯 Decisión METICHE"} 
+D0 -->|Si Gus ordena ejecucion inmediata| C{"🎯 Decisión METICHE"} 
  D0 -->|📋 No (por defecto)| COLA_FIFO["📋 COLA FIFO-EJECUTIVA"] 
  
  %% === COLA FIFO CON MONTÍCULOS === 
@@ -327,7 +327,7 @@ Espacio en disco:
 
 ```bash
 git clone <tu-repo-url>
-cd metiche-os-link
+cd metiche-os
 ```
 
 ### 2) Crear entorno virtual
@@ -504,7 +504,7 @@ Cliente de integración:
 ## Estructura del Proyecto
 
 ```text
-metiche-os-link/
+metiche-os/
 ├─ app/
 │  ├─ api/                  # Endpoints FastAPI (health, tasks, narrative, rules, soul)
 │  ├─ bootstrap/            # Semillas iniciales
@@ -519,6 +519,7 @@ metiche-os-link/
 │  ├─ projections/          # Exportadores (bitácora)
 │  └─ sql/                  # DDL narrativo aditivo
 ├─ data/                    # SQLite y exportables
+├─ dashboard/               # Dashboard web y utilidades de release lab
 ├─ projections/             # Salidas proyectadas
 ├─ MANUAL_USUARIO.md        # Manual técnico-operativo extenso
 ├─ MANUAL_USUARIO_FULL.html # Manual HTML completo
