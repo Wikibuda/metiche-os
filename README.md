@@ -138,7 +138,7 @@ graph TD
 
 - Operativa: flujo de tareas, decisiones, ejecución, cola y validación (`app/domain/tasks`).
 - Memoria narrativa: eventos, candidatos y crónicas (`app/domain/narrative` + tablas narrativas).
-- Validación multicanal real: Telegram, WhatsApp, Shopify, Dashboard, Deepseek (`app/domain/validators`).
+- Validación multicanal real: Telegram, WhatsApp, Shopify, Dashboard, DeepSeek (`app/domain/validators`).
 - Proyecciones: bitácora Markdown exportable (`app/projections/bitacora.py`).
 - Integración externa: Plane para registrar fallas de validación (`app/integrations/plane.py`).
 
