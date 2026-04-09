@@ -345,6 +345,18 @@ curl -s -X POST http://127.0.0.1:8091/tasks/run \
 curl -s http://127.0.0.1:8091/tasks/<task_id>/flow | jq
 ```
 
+## Dashboard Local
+
+### Levantar dashboard
+
+```bash
+./scripts/run-dashboard-5063.sh
+```
+
+URL principal:
+
+- `http://127.0.0.1:5063/admin-dashboard.html`
+
 ## Integración con Plane
 
 Cuando `PLANE_SYNC_ENABLED=true` y la validación falla:
