@@ -47,241 +47,39 @@ Relación con OpenClaw:
 El siguiente diagrama representa la arquitectura de referencia (visión operativa + estratégica del proyecto):
 
 ```mermaid
-graph TD 
- %% === PALETA DE COLORES PRINCIPAL === 
- classDef jefe fill:#FF6B9D,stroke:#333,stroke-width:3px,color:#fff,font-weight:bold 
- classDef metiche fill:#4A90E2,stroke:#333,stroke-width:3px,color:#fff,font-weight:bold 
- classDef bot fill:#FFD166,stroke:#333,stroke-width:2px,color:#333 
- classDef decision fill:#06D6A0,stroke:#333,stroke-width:3px,color:#fff,font-weight:bold 
- classDef enjambre fill:#118AB2,stroke:#333,stroke-width:2px,color:#fff 
- classDef proyecto fill:#EF476F,stroke:#333,stroke-width:2px,color:#fff 
- classDef regla fill:#7209B7,stroke:#333,stroke-width:2px,color:#fff 
- classDef sistema fill:#073B4C,stroke:#333,stroke-width:2px,color:#fff 
- classDef entrega fill:#FF9E00,stroke:#333,stroke-width:3px,color:#fff,font-weight:bold 
- classDef cola fill:#FFA726,stroke:#333,stroke-width:3px,color:#fff,font-weight:bold 
- classDef monticulo fill:#8AC926,stroke:#333,stroke-width:2px,color:#fff 
- classDef memoria fill:#9C27B0,stroke:#333,stroke-width:2px,color:#fff 
- classDef optimizacion fill:#FF5722,stroke:#333,stroke-width:2px,color:#fff 
- 
- %% === NODOS PRINCIPALES === 
- A["🏢 JEFE ADOPTIVO Gus"] -->|📨 Solicitud prioritaria| B["🤖 METICHE Coordinador"] 
- A -->|💬 Comenta en Plane| N["🤖 PLANE NOTIFIER BOT"] 
- 
- %% === DECISIÓN DE COLA === 
- B --> D0{"🎯 ¿Orden explícita ejecución inmediata?"} 
-D0 -->|Si Gus ordena ejecucion inmediata| C{"🎯 Decisión METICHE"} 
- D0 -->|📋 No (por defecto)| COLA_FIFO["📋 COLA FIFO-EJECUTIVA"] 
- 
- %% === COLA FIFO CON MONTÍCULOS === 
- COLA_FIFO -->|🔁 Procesar siguiente| D0 
- 
- subgraph COLA["📋 COLA FIFO-EJECUTIVA (MONTÍCULOS)"] 
-    direction LR 
-    MONTICULO_EN_PROGRESO["⚡ MONTÍCULO EN PROGRESO"] 
-    MONTICULO_BLOQUEANTES["⛰️ MONTÍCULO BLOQUEANTES"] 
-    MONTICULO_URGENTES["🔥 MONTÍCULO URGENTES"] 
-    MONTICULO_HIGH["🚀 MONTÍCULO HIGH"] 
-    MONTICULO_MEDIUM["📊 MONTÍCULO MEDIUM"] 
-    MONTICULO_LOW["🐌 MONTÍCULO LOW"] 
-    
-    MONTICULO_EN_PROGRESO -->|Primero| MONTICULO_BLOQUEANTES 
-    MONTICULO_BLOQUEANTES -->|Segundo| MONTICULO_URGENTES 
-    MONTICULO_URGENTES -->|Tercero| MONTICULO_HIGH 
-    MONTICULO_HIGH -->|Cuarto| MONTICULO_MEDIUM 
-    MONTICULO_MEDIUM -->|Quinto| MONTICULO_LOW 
- end 
- 
- %% Contenido de los montículos (como nodos independientes para mantener información) 
- PROG_217["#217 Ideas Brillantes (Pool Memoria)"] --> MONTICULO_EN_PROGRESO 
- PROG_218["#218 Optimización DeepSeek + TRAE IDE"] --> MONTICULO_EN_PROGRESO 
- PROG_219["#219 Integración TRAE IDE"] --> MONTICULO_EN_PROGRESO 
- 
- BLOQ_208["#208 Bomberazo #001"] --> MONTICULO_BLOQUEANTES 
- BLOQ_204["#204 Presupuesto DeepSeek"] --> MONTICULO_BLOQUEANTES 
- BLOQ_203["#203 Regla #10 JOY"] --> MONTICULO_BLOQUEANTES 
- 
- URG_91["#91 Telegram Polling Loops"] --> MONTICULO_URGENTES 
- URG_93["#93 Errores WhatsApp"] --> MONTICULO_URGENTES 
- URG_94["#94 Fermentación IA"] --> MONTICULO_URGENTES 
- 
- HIGH_89["#89 Configurar SMTP"] --> MONTICULO_HIGH 
- HIGH_90["#90 Recuperar voz TTS"] --> MONTICULO_HIGH 
- HIGH_92["#92 Monitor Telegram"] --> MONTICULO_HIGH 
- 
- MED_206["#206 Árbol Decisiones"] --> MONTICULO_MEDIUM 
- MED_210["#210 Permisos device-auth"] --> MONTICULO_MEDIUM 
- MED_212["#212 Actualizar diagrama"] --> MONTICULO_MEDIUM 
- 
- LOW_201["#201 Git cleanup"] --> MONTICULO_LOW 
- LOW_202["#202 Test BD"] --> MONTICULO_LOW 
- LOW_211["#211 Limpieza demo"] --> MONTICULO_LOW 
- 
- %% === DECISIONES METICHE === 
- C -->|🤖 Tarea automatizable| D["🚀 LANZAR ENJAMBRE"] 
- C -->|🧠 Planificación estratégica| E["💡 METICHE DIRECTAMENTE"] 
- C -->|📝 Respuesta a comentario| P["✍️ Responder en Plane"] 
- C -->|💰 Análisis financiero| ROI["📊 PROYECTO ROI"] 
- C -->|⚡ Automatización total| ATP["🚀 AUTOMATIZACIÓN TOTAL PLANE"] 
- 
- N -->|📨 Notificación Telegram| B 
- N -->|🗃️ BD Polling cada 2min| O["🗃️ Base de Datos Plane"] 
- 
- %% === SISTEMA HÍBRIDO DEEPSEEK === 
- subgraph SISTEMA_HIBRIDO["🤖 SISTEMA HÍBRIDO DEEPSEEK (Optimización costos)"] 
-    direction LR 
-    ROUTER["🎯 Router Clasificador"] -->|Tarea simple| CHAT["💬 DeepSeek Chat ($0.14/1M)"] 
-    ROUTER -->|Tarea compleja| REASONER["🧠 DeepSeek Reasoner ($0.27/1M)"] 
-    ROUTER -->|WhatsApp Business| REASONER_WA["📱 WhatsApp (Siempre Reasoner)"] 
-    ROUTER -->|Duda| REASONER 
-    
-    CHAT -->|Ahorro 48%| METRICAS["📊 Métricas Ahorro"] 
-    REASONER -->|Calidad garantizada| METRICAS 
-    REASONER_WA -->|Regla #3| METRICAS 
- end 
- 
- B -->|Tareas internas| ROUTER 
- E -->|Planificación| REASONER 
- 
- %% === POOL DE MEMORIA INTELIGENTE === 
- subgraph POOL_MEMORIA["🧠 POOL DE MEMORIA INTELIGENTE (Idea #1)"] 
-    direction TB 
-    MEM_API["📡 API REST /memory"] -->|POST| MEM_DB["🗃️ SQLite + JSON"] 
-    MEM_API -->|GET query| MEM_DB 
-    MEM_DB -->|Reglas| MEM_RULES["📜 Reglas #1-#11"] 
-    MEM_DB -->|Decisiones| MEM_DECISIONS["💡 Decisiones históricas"] 
-    MEM_DB -->|Errores| MEM_ERRORS["⚠️ Errores aprendidos"] 
-    MEM_DB -->|Éxitos| MEM_SUCCESS["✅ Éxitos replicables"] 
- end 
- 
- B -->|Aprendizajes| MEM_API 
- G -->|Datos enjambres| MEM_API 
- H -->|Interacciones WhatsApp| MEM_API 
- 
- %% === ENJAMBRES === 
- D --> F["🔄 TRABAJO EN BACKGROUND"] 
- 
- subgraph Enjambres ["🌈 ENJAMBRES ESPECIALIZADOS"] 
-   G["📊 Enjambre Dashboard"] 
-   H["💬 Enjambre WhatsApp"] 
-   I["🛒 Enjambre Shopify"] 
-   J["🤖 Enjambre DeepSeek"] 
-   K["📋 Enjambre Plane"] 
-   CIE["💰 CONTROL INGRESOS/EGRESOS"] 
- end 
- 
- F --> G 
- F --> H 
- F --> I 
- F --> J 
- F --> K 
- F --> CIE 
- 
- %% === VALIDACIÓN Y REPORTE === 
- G --> L["✅ VALIDACIÓN AUTOMÁTICA"] 
- H --> L 
- I --> L 
- J --> L 
- K --> L 
- CIE --> L 
- 
- L --> M["📄 REPORTE ÚNICO FINAL"] 
- E --> M 
- P --> Q["💬 Comentario insertado en Plane"] 
- Q --> R["🏷️ Marcado como procesado"] 
- ROI --> M 
- ATP --> M 
- 
- M --> S["🎁 ENTREGA A JEFE"] 
- 
- %% === REGLAS GRABADAS EN PIEDRA === 
- T["🪨 REGLAS GRABADAS EN PIEDRA"] --> B 
- 
- subgraph Reglas ["📜 REGLAS OPERATIVAS"] 
- U["1️⃣ No pedir tareas manuales automatizables"] 
- V["2️⃣ No usar wacli"] 
- W["3️⃣ WhatsApp siempre con Reasoner (NIVEL DIOS)"] 
- X["4️⃣ Acceso a Plane por BD directa"] 
- Y["5️⃣ Cargar contexto tras reset"] 
- Z["6️⃣ Dashboard tiempo real"]
- AA["7️⃣ Validación post-configuración (Telegram+WhatsApp+Dashboard)"] 
- BB["8️⃣ LaunchAgent > crontab para entorno completo"] 
- CC["9️⃣ Registro modificaciones en Plane"] 
- JOY["🔟 NO DEJES PARA MAÑANA LO QUE PUEDES HACER JOY"] 
- REGLA11["1️⃣1️⃣ Órdenes Jefe Gus se encolan por defecto"] 
- end 
- 
- T --> U 
- T --> V 
- T --> W 
- T --> X 
- T --> Y 
- T --> Z 
- T --> AA 
- T --> BB 
- T --> CC 
- T --> JOY 
- T --> REGLA11 
- 
- %% === SISTEMA PLANE-KEEPER === 
- X --> K 
- X --> AB["📦 Plane-Keeper Sistema"] 
- 
- subgraph Herramientas ["🔧 HERRAMIENTAS PLANE"] 
- AC["🔧 plane_db_helper.py"] 
- AD["📝 plane_keeper.py"] 
- AE["🎯 Registro automático 'Inicio + Final'"] 
- AF["👁️ plane_monitor.py"] 
- end 
- 
- AB --> AC 
- AB --> AD 
- AB --> AE 
- AB --> AF 
- 
- %% === MANTENIMIENTO AUTOMÁTICO PLANE === 
- K --> AG["🔄 Mantenimiento automático Plane"] 
- 
- subgraph Funcionalidades ["📈 FUNCIONALIDADES PLANE"] 
- AH["📊 Issues actualizados"] 
- AI["🏷️ Labels sincronizados"] 
- AJ["📈 Métricas automatizadas"] 
- AK["💬 Comentarios monitoreados"] 
- end 
- 
- AG --> AH 
- AG --> AI 
- AG --> AJ 
- AG --> AK 
- 
- %% === DASHBOARD TIEMPO REAL === 
- Z --> AL["⚡ Refresh manual = instantáneo"] 
- Z --> AM["🔄 Auto-refresh cada 5 min"] 
- Z --> AN["📡 Datos Shopify/DeepSeek real-time"] 
- 
- %% === EXPANSIÓN PROYECTO ROI === 
- ROI --> ROI1["📈 Análisis CSV histórico"] 
- ROI --> ROI2["💰 Tracking gastos por agente"] 
- ROI --> ROI3["📊 Dashboard métricas ROI"] 
- ROI --> ROI4["🤖 Decisiones inteligentes modelos"] 
- 
- ROI1 --> CSV["💾 CSV histórico: $60.83 USD (1-25 marzo)"] 
- CSV --> CSV1["💵 Reasoner: $57.30 USD (94.2%)"] 
- 
- %% === ASIGNACIÓN DE CLASES === 
- class A jefe 
- class B metiche 
- class N bot 
- class D0 decision 
- class C decision 
- class D,E,P,ROI,ATP proyecto 
- class G,H,I,J,K,CIE enjambre 
- class U,V,W,X,Y,Z,AA,BB,CC,JOY,REGLA11 regla 
- class O,AB,AC,AD,AE,AF,AG,AH,AI,AJ,AK sistema 
- class ROUTER,CHAT,REASONER,REASONER_WA,METRICAS optimizacion 
- class MEM_API,MEM_DB,MEM_RULES,MEM_DECISIONS,MEM_ERRORS,MEM_SUCCESS memoria 
- class PROG_217,PROG_218,PROG_219,BLOQ_208,BLOQ_204,BLOQ_203,URG_91,URG_93,URG_94,HIGH_89,HIGH_90,HIGH_92,MED_206,MED_210,MED_212,LOW_201,LOW_202,LOW_211 monticulo 
- class COLA_FIFO cola 
- class S entrega
+graph TD
+  A[Jefe Gus] --> B[Metiche Coordinador]
+  B --> C{Ejecucion inmediata}
+  C -->|si| D[Lanzar Enjambres]
+  C -->|no| E[Cola FIFO Ejecutiva]
+  E --> C
+
+  D --> F[Trabajo Background]
+  F --> G[Enjambre Dashboard]
+  F --> H[Enjambre WhatsApp]
+  F --> I[Enjambre Shopify]
+  F --> J[Enjambre DeepSeek]
+  F --> K[Enjambre Plane]
+
+  G --> L[Validacion Automatica]
+  H --> L
+  I --> L
+  J --> L
+  K --> L
+
+  L --> M[Reporte Unico Final]
+  M --> N[Entrega al Jefe]
+
+  B --> O[Sistema Narrativo]
+  O --> P[task_events]
+  O --> Q[narrative_candidates]
+  O --> R[narrative_entries]
+
+  B --> S[Integracion Plane]
+  S --> T[Issue y Comentario]
+
+  B --> U[Dashboard]
+  U --> V[dashboard/admin-dashboard-lab.html]
 ```
 
 ### Capas arquitectónicas (estado actual)
@@ -326,7 +124,7 @@ Espacio en disco:
 ### 1) Clonar y entrar al proyecto
 
 ```bash
-git clone <tu-repo-url>
+git clone https://github.com/Wikibuda/metiche-os.git
 cd metiche-os
 ```
 
