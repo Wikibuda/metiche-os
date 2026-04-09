@@ -19,6 +19,7 @@ Sistema operativo de coordinación para la IA personal de Gus: tareas, decisione
 - [Demo Visual](#demo-visual)
 - [Validadores por Canal](#validadores-por-canal)
 - [Narrativa y Bitácora](#narrativa-y-bitácora)
+- [Arranque Consolidado](#arranque-consolidado)
 - [API HTTP](#api-http)
 - [Integración con Plane](#integración-con-plane)
 - [Estructura del Proyecto](#estructura-del-proyecto)
@@ -297,6 +298,36 @@ Escala de asombro para validación:
 Proyección de bitácora:
 
 - Archivo generado en `projections/bitacora/bitacora_de_asombros.md`.
+
+## Arranque Consolidado
+
+Script recomendado para levantar todo el entorno local consolidado (API + worker + dashboard):
+
+```bash
+./scripts/run-stack-consolidado.sh
+```
+
+El script realiza:
+
+- `docker compose up -d --build app worker` bajo proyecto `metiche-os`.
+- Reinicio limpio del dashboard en `5063` con `dashboard/dashboard-server.mjs`.
+- Validación de salud en API (`8091`) y dashboard lab (`5063`).
+
+URLs:
+
+- API docs: `http://127.0.0.1:8091/docs`
+- Dashboard lab: `http://127.0.0.1:5063/admin-dashboard.html`
+
+Artefactos generados:
+
+- Log del dashboard: `data/dashboard-5063.log`
+- PID del dashboard: `.dashboard-5063.pid`
+
+Opcionales por entorno:
+
+```bash
+COMPOSE_PROJECT=metiche-os DASHBOARD_PORT=5063 ./scripts/run-stack-consolidado.sh
+```
 
 ## API HTTP
 
