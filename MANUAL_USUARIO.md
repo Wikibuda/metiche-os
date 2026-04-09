@@ -65,11 +65,13 @@ Base:
 Plane:
 
 - `PLANE_BASE_URL` o `PLANE_API_URL`
-- `PLANE_WORKSPACE_SLUG`
-- `PLANE_PROJECT_ID`
-- `PLANE_ISSUES_BASE_URL` (opcional si no se usa build por slug/project)
-- `PLANE_API_KEY` o `PLANE_API_TOKEN`
-- `PLANE_BEARER_TOKEN` (opcional)
+- `PLANE_USE_DIRECT_DB` (`true` para modo DB directo)
+- `PLANE_DB_TYPE` (`postgres` o `sqlite`)
+- `PLANE_LOCAL_ENABLED`
+- `PLANE_DB_PATH` (ruta absoluta al SQLite local de Plane)
+- `PLANE_PG_HOST`, `PLANE_PG_PORT`, `PLANE_PG_USER`, `PLANE_PG_PASSWORD`, `PLANE_PG_DBNAME`
+- `PLANE_SYNC_PULL_LABEL` (default `metiche:task`)
+- `PLANE_ISSUE_DEFAULT_STATUS`, `PLANE_ISSUE_SUCCESS_STATUS`, `PLANE_ISSUE_FAILURE_STATUS`
 
 Validacion general:
 
@@ -100,6 +102,7 @@ Tareas:
 - `metiche run --task "titulo" --task-type whatsapp --description "detalle"`
 - `metiche validate --task-id <task_id>`
 - `metiche run-worker`
+- `metiche plane-sync --process-issues --limit 20`
 
 Narrativa:
 
@@ -117,6 +120,12 @@ Semilla historica:
 Bitacora:
 
 - `metiche build-bitacora`
+
+Memoria:
+
+- `metiche memory add --title "..." --content "..." --event-type learning --importance-level medium --wonder-level 3`
+- `metiche memory list --event-type decision --limit 10`
+- `metiche memory stats`
 
 ## 5) API HTTP (resumen rapido)
 
@@ -137,11 +146,26 @@ Tasks:
 - `GET /tasks/{task_id}/dispatch`
 - `GET /tasks/overview`
 - `GET /tasks/{task_id}/escalation`
+- `GET /dashboard/operativo`
+- `GET /dashboard/stats`
+- `GET /dashboard/tasks`
+- `GET /dashboard/tasks/{task_id}`
+- `POST /dashboard/tasks/run`
+- `POST /dashboard/tasks/{task_id}/action`
+- `GET /dashboard/validators`
+- `GET /dashboard/recent-narratives`
 
 Narrative:
 
 - `POST /narrative`
 - `GET /narrative`
+
+Memory:
+
+- `POST /memory`
+- `GET /memory`
+- `GET /memory/{entry_id}`
+- `GET /memory/stats`
 
 ## 6) Validadores por canal
 
@@ -176,6 +200,33 @@ Optimizacion:
 
 - Cache TTL 60s para evitar ejecutar el comando en cada validacion consecutiva.
 
+## 6.2 Dashboard operativo (War Room)
+
+URLs:
+
+- `http://127.0.0.1:5063/operativo.html` (dashboard local)
+- `http://127.0.0.1:8091/dashboard/operativo` (servido por FastAPI)
+
+Flujos principales:
+
+1. Crear tarea:
+- Completa canal + titulo en "Lanzar Tarea Rapida".
+- Pulsa `Ejecutar`.
+- Verifica que aparece en la columna `queued` o `running` sin recargar.
+
+2. Simular falla y reintentar:
+- Fuerza validacion negativa para un canal.
+- Verifica estado `failed`.
+- Pulsa `Reintentar` en tarjeta o panel de detalle.
+
+3. Ver timeline:
+- Selecciona una tarjeta.
+- Revisa la seccion "Timeline" en el panel derecho (eventos `task_events`).
+
+4. Revisar validadores:
+- Confirma estado verde/rojo por canal en "Estado de Validadores".
+- Haz clic en el validador para abrir detalle del ultimo intento.
+
 ## 7) Como agregar un nuevo validador (paso a paso)
 
 Ejemplo: `MiCanalValidator`.
@@ -198,6 +249,26 @@ Buenas practicas:
 - Mantener cambios aditivos (sin romper otros validadores).
 - Incluir metadatos utiles para debug (`status_code`, `endpoint`, `error`).
 - Diferenciar bien errores criticos vs informativos para impactar asombro narrativo correctamente.
+
+## 8) Plane-Keeper local/directo (Fase 6)
+
+Resumen:
+
+- Metiche ya no depende de API HTTP de Plane para sincronia operativa.
+- La sincronizacion soporta acceso directo a DB (`postgres` o `sqlite`) y modo API HTTP.
+- Se mantiene trazabilidad en tabla `plane_sync` y eventos `task_events` (`plane_sync_attempt`).
+
+Flujo:
+
+1. Cuando una tarea termina validada/fallida, Metiche intenta sincronizar issue local.
+2. Si falla la validacion y no hay issue previo, crea uno.
+3. Actualiza estado y etiquetas, y agrega comentario con resumen.
+4. Guarda/actualiza relacion `task_id <-> plane_issue_id`.
+
+Sincronizacion inversa:
+
+- `metiche plane-sync --process-issues` toma issues con etiqueta objetivo (`PLANE_SYNC_PULL_LABEL`) y crea tareas en Metiche.
+- En modo API HTTP, la sincronizacion inversa depende de capacidades del endpoint; en modo DB directo funciona con consultas locales/SQL.
 
 ## 8) Mantenimiento de bitacora y narrativa
 

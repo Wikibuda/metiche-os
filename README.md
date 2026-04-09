@@ -21,6 +21,7 @@ Sistema operativo de coordinación para la IA personal de Gus: tareas, decisione
 - [Narrativa y Bitácora](#narrativa-y-bitácora)
 - [Arranque Consolidado](#arranque-consolidado)
 - [API HTTP](#api-http)
+- [API `/memory`](#api-memory)
 - [Integración con Plane](#integración-con-plane)
 - [Estructura del Proyecto](#estructura-del-proyecto)
 - [Contribución](#contribución)
@@ -143,9 +144,11 @@ graph TD
 - Proyecciones: bitácora Markdown exportable (`app/projections/bitacora.py`).
 - Integración externa: Plane para registrar fallas de validación (`app/integrations/plane.py`).
 
-### Componentes de visión (próximamente)
+### Componentes de visión (estado)
 
-El diagrama incluye piezas estratégicas todavía no implementadas en este repositorio como API `/memory`, Plane-Keeper completo, y automatización total de Plane; se mantienen como hoja de ruta.
+- API `/memory`: implementada (Fase 5).
+- Plane-Keeper completo: implementado (Fase 6).
+- Automatización total de Plane por polling: implementada (Fase 7).
 
 ## Características Principales
 
@@ -155,7 +158,7 @@ El diagrama incluye piezas estratégicas todavía no implementadas en este repos
 - Emisión de `validation_attempt` como eventos operativos.
 - Narrativa automática con nivel de asombro (3, 4, 5 según resultado).
 - CLI de operación (`run`, `validate`, `narrator-tick`, `--cuentame`, `build-bitacora`).
-- API HTTP para tareas, narrativa y salud.
+- API HTTP para tareas, narrativa, memoria y salud.
 - Sincronía con Plane ante validaciones fallidas.
 - Manual completo para operación y extensión en `MANUAL_USUARIO.md`.
 
@@ -206,10 +209,17 @@ DATABASE_URL=sqlite:////ruta/absoluta/metiche_os.db
 PLANE_SYNC_ENABLED=true
 OPENCLAW_GATEWAY_URL=http://127.0.0.1:18797
 
-PLANE_BASE_URL=https://api.plane.so
-PLANE_WORKSPACE_SLUG=<slug>
-PLANE_PROJECT_ID=<id>
-PLANE_API_KEY=<token>
+PLANE_SYNC_ENABLED=true
+PLANE_USE_DIRECT_DB=true
+PLANE_DB_TYPE=postgres
+PLANE_LOCAL_ENABLED=true
+PLANE_DB_PATH=/ruta/absoluta/plane.db
+PLANE_PG_HOST=localhost
+PLANE_PG_PORT=5432
+PLANE_PG_USER=plane
+PLANE_PG_PASSWORD=plane
+PLANE_PG_DBNAME=plane
+PLANE_SYNC_PULL_LABEL=metiche:task
 ```
 
 ### 5) Inicializar base de datos
@@ -317,6 +327,8 @@ URLs:
 
 - API docs: `http://127.0.0.1:8091/docs`
 - Dashboard lab: `http://127.0.0.1:5063/admin-dashboard.html`
+- War Room: `http://127.0.0.1:5063/operativo.html`
+- War Room (FastAPI): `http://127.0.0.1:8091/dashboard/operativo`
 
 Artefactos generados:
 
@@ -354,6 +366,18 @@ Documentacion Swagger:
 - `GET /tasks/overview`
 - `POST /narrative`
 - `GET /narrative`
+- `POST /memory`
+- `GET /memory`
+- `GET /memory/{entry_id}`
+- `GET /memory/stats`
+- `GET /dashboard/operativo`
+- `GET /dashboard/stats`
+- `GET /dashboard/tasks`
+- `GET /dashboard/tasks/{task_id}`
+- `POST /dashboard/tasks/run`
+- `POST /dashboard/tasks/{task_id}/action`
+- `GET /dashboard/validators`
+- `GET /dashboard/recent-narratives`
 
 ### Ejemplos curl
 
@@ -376,6 +400,48 @@ curl -s -X POST http://127.0.0.1:8091/tasks/run \
 curl -s http://127.0.0.1:8091/tasks/<task_id>/flow | jq
 ```
 
+```bash
+curl -s -X POST http://127.0.0.1:8091/memory \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Decision de enrutamiento",
+    "content": "Se priorizó canal whatsapp por urgencia operativa",
+    "event_type": "decision",
+    "importance_level": "high",
+    "wonder_level": 4,
+    "source": "metiche"
+  }' | jq
+```
+
+```bash
+curl -s "http://127.0.0.1:8091/memory?event_type=decision&limit=10" | jq
+```
+
+```bash
+curl -s http://127.0.0.1:8091/memory/stats | jq
+```
+
+## API `/memory`
+
+La API de memoria expone un pool de eventos durables para decisiones, errores, éxitos y aprendizajes.
+
+Campos de entrada principales:
+
+- `title`: titulo breve de la memoria.
+- `content`: detalle de la memoria.
+- `event_type`: `decision` | `error` | `success` | `learning`.
+- `importance_level`: `low` | `medium` | `high`.
+- `wonder_level`: escala 1-5.
+- `source`: origen (ej. `metiche`, `enjambre_shopify`).
+- `related_task_id`: referencia opcional a `task.id`.
+
+Endpoints:
+
+- `POST /memory` crea una entrada.
+- `GET /memory` lista con filtros/paginación (`event_type`, `importance_level`, `wonder_level`, `source`, `start_date`, `end_date`, `limit`, `offset`).
+- `GET /memory/{entry_id}` recupera una entrada por ID.
+- `GET /memory/stats` resume totales por tipo/importancia y promedio de asombro.
+
 ## Dashboard Local
 
 ### Levantar dashboard
@@ -384,20 +450,80 @@ curl -s http://127.0.0.1:8091/tasks/<task_id>/flow | jq
 ./scripts/run-dashboard-5063.sh
 ```
 
-URL principal:
+URLs principales:
 
 - `http://127.0.0.1:5063/admin-dashboard.html`
+- `http://127.0.0.1:5063/operativo.html`
+- `http://127.0.0.1:8091/dashboard/operativo`
+
+### War Room operativo
+
+Vista unica para operacion diaria:
+
+- Lanzamiento rapido de tareas por canal en 2 clics.
+- Tablero en tiempo real por estados `queued`, `running`, `retrying`, `failed`, `done`.
+- Acciones directas por tarea: reintentar, cancelar, ver log y abrir en Plane.
+- Detalle lateral con timeline de `task_events`, payload y validacion.
+- Estado real de validadores (ultimo `validation_attempt`) y cronicas recientes.
+- Alertas proactivas por retrying estancado y cola `blocking`.
 
 ## Integración con Plane
 
-Cuando `PLANE_SYNC_ENABLED=true` y la validación falla:
+En Fase 6, la integración soporta tres modos:
 
-- Se crea un issue con contexto de canales fallidos.
-- Se agrega comentario al issue con resumen de la falla.
+- `PLANE_USE_DIRECT_DB=true` + `PLANE_DB_TYPE=postgres`: acceso directo a PostgreSQL de Plane (Docker/self-host).
+- `PLANE_USE_DIRECT_DB=true` + `PLANE_DB_TYPE=sqlite`: acceso local a `plane.db` (SQLite).
+- `PLANE_USE_DIRECT_DB=false`: integración por API HTTP (`app/integrations/plane.py`).
 
-Cliente de integración:
+Flujo principal:
 
-- `app/integrations/plane.py` (`create_issue`, `update_issue`, `comment_on_issue`).
+- Al cerrar validaciones (`validated` o `failed`), Metiche sincroniza estado en Plane local.
+- Si no existe issue asociado y hay falla, se crea issue con etiquetas de tarea.
+- Se actualiza estado del issue (`completed` en éxito, `in_progress` en falla por defecto).
+- Se agrega comentario con resumen de validación y trazabilidad de crónica.
+- Todo intento de sincronía queda registrado en `task_events` con tipo `plane_sync_attempt`.
+- La relación tarea↔issue se guarda en tabla `plane_sync` (BD de Metiche).
+
+Sincronización inversa (issues -> tareas):
+
+```bash
+metiche plane-sync --process-issues --limit 20
+```
+
+- Busca issues por etiqueta `metiche:task` (configurable con `PLANE_SYNC_PULL_LABEL`).
+- Crea tareas en Metiche y guarda la relación en `plane_sync`.
+- Marca el issue con etiqueta `in_progress` y añade comentario de trazabilidad.
+
+Worker de automatización continua (polling):
+
+```bash
+metiche plane-watch
+```
+
+```bash
+metiche plane-watch --once --dry-run --limit 30
+```
+
+- Respeta `PLANE_DB_TYPE` (`postgres`/`sqlite`) usando el mismo adaptador dinámico de Fase 6.
+- Intervalo configurable por `.env` con `PLANE_WATCH_INTERVAL` (o `--interval` por CLI).
+- Etiquetas observadas por defecto: `PLANE_WATCH_LABELS` (`metiche:task,run:whatsapp,run:shopify,run:enjambre,run:operational,schedule:cron`).
+- Emite logs JSON por tick (`plane_watch_tick`) para ingestión en monitorización.
+- Guarda idempotencia en `plane_processed_issues` para evitar reprocesar issues.
+
+Mejora futura sugerida:
+
+- Alternativa webhook/event-driven para evitar polling (por ejemplo `pg_notify` o `plane-webhook`).
+
+Cliente de integración local:
+
+- `app/integrations/plane_local.py`
+- `app/integrations/plane_postgres.py`
+
+Notas para PostgreSQL:
+
+- Requiere `psycopg2-binary` instalado.
+- Variables mínimas: `PLANE_PG_HOST`, `PLANE_PG_PORT`, `PLANE_PG_USER`, `PLANE_PG_PASSWORD`, `PLANE_PG_DBNAME`.
+- El módulo adapta estados por nombre (`Todo`, `In Progress`, `Done`) usando la tabla real `states`.
 
 ## Estructura del Proyecto
 
@@ -467,7 +593,7 @@ Con `metiche validate --task-id <task_id>`.
 
 ### ¿El sistema ya tiene API de memoria `/memory`?
 
-No en este repositorio actual. Aparece en la visión/roadmap del diagrama como **próximamente**.
+Sí. Está disponible en la API HTTP y también vía CLI con `metiche memory add|list|stats`.
 
 ## Licencia
 

@@ -2,7 +2,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.api.routes_dashboard import router as dashboard_router
 from app.api.routes_health import router as health_router
+from app.api.routes_memory import router as memory_router
 from app.api.routes_narrative import router as narrative_router
 from app.api.routes_rules import router as rules_router
 from app.api.routes_soul import router as soul_router
@@ -23,4 +25,6 @@ app.include_router(health_router)
 app.include_router(tasks_router)
 app.include_router(soul_router)
 app.include_router(narrative_router)
+app.include_router(memory_router)
 app.include_router(rules_router)
+app.include_router(dashboard_router)
