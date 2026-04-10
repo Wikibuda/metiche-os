@@ -11,6 +11,7 @@ const OPENCLAW_ROOT = path.join(HOME, ".openclaw");
 const WORKSPACE_PERSONAL = path.join(OPENCLAW_ROOT, "workspace-personal");
 const MODULE_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DASHBOARD_FILE = process.env.DASHBOARD_FILE || path.join(MODULE_DIR, "operativo.html");
+const ADMIN_DASHBOARD_FILE = path.join(MODULE_DIR, "admin-dashboard-lab.html");
 const LEGACY_DASHBOARD_FILE = path.join(WORKSPACE_PERSONAL, "admin-dashboard-lab.html");
 const OPENCLAW_CONFIG = path.join(OPENCLAW_ROOT, "openclaw.json");
 const PROD_LOG = path.join(OPENCLAW_ROOT, "logs", "gateway.log");
@@ -712,11 +713,15 @@ async function parseRequestBody(req) {
   }
 }
 
-async function loadDashboardHtml() {
+async function loadDashboardHtml(preferredPath = DASHBOARD_FILE) {
   try {
-    return await fs.readFile(DASHBOARD_FILE, "utf-8");
+    return await fs.readFile(preferredPath, "utf-8");
   } catch {
-    return await fs.readFile(LEGACY_DASHBOARD_FILE, "utf-8");
+    try {
+      return await fs.readFile(DASHBOARD_FILE, "utf-8");
+    } catch {
+      return await fs.readFile(LEGACY_DASHBOARD_FILE, "utf-8");
+    }
   }
 }
 
@@ -755,14 +760,15 @@ const server = createServer(async (req, res) => {
     const requestUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
     console.log(`📡 Request: ${req.method} ${requestUrl.pathname} (host: ${req.headers.host})`);
 
+    if (req.method === "GET" && requestUrl.pathname === "/admin-dashboard.html") {
+      const html = await loadDashboardHtml(ADMIN_DASHBOARD_FILE);
+      sendHtml(res, html);
+      return;
+    }
+
     if (
       req.method === "GET" &&
-      (
-        requestUrl.pathname === "/" ||
-        requestUrl.pathname === "/lab" ||
-        requestUrl.pathname === "/admin-dashboard.html" ||
-        requestUrl.pathname === "/operativo.html"
-      )
+      (requestUrl.pathname === "/" || requestUrl.pathname === "/lab" || requestUrl.pathname === "/operativo.html")
     ) {
       const html = await loadDashboardHtml();
       sendHtml(res, html);
@@ -771,7 +777,12 @@ const server = createServer(async (req, res) => {
 
     if (
       (req.method === "GET" || req.method === "POST") &&
-      (requestUrl.pathname.startsWith("/dashboard/") || requestUrl.pathname.startsWith("/memory"))
+      (
+        requestUrl.pathname.startsWith("/dashboard/") ||
+        requestUrl.pathname.startsWith("/memory") ||
+        requestUrl.pathname === "/swarm" ||
+        requestUrl.pathname.startsWith("/swarm/")
+      )
     ) {
       await proxyDashboardApi(req, res, requestUrl);
       return;

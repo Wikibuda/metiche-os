@@ -18,6 +18,7 @@ from app.domain.swarm.models import (
     SwarmRead,
     SwarmRunCreate,
     SwarmRunRead,
+    SwarmSummaryRead,
     SwarmVote,
 )
 
@@ -61,6 +62,17 @@ def get_swarm(session: Session, swarm_id: str) -> SwarmRead | None:
         return None
     agents = session.exec(select(SwarmAgent).where(SwarmAgent.swarm_id == swarm_id).order_by(SwarmAgent.agent_name)).all()
     return SwarmRead.from_model(swarm, agents)
+
+
+def list_swarms(session: Session, limit: int = 20) -> list[SwarmSummaryRead]:
+    rows = session.exec(select(Swarm).order_by(Swarm.updated_at.desc()).limit(limit)).all()
+    output: list[SwarmSummaryRead] = []
+    for swarm in rows:
+        agents = session.exec(
+            select(SwarmAgent).where(SwarmAgent.swarm_id == swarm.id).order_by(SwarmAgent.agent_name)
+        ).all()
+        output.append(SwarmSummaryRead.from_model(swarm, agents))
+    return output
 
 
 def run_swarm_cycle(session: Session, swarm_id: str, payload: SwarmRunCreate) -> SwarmRunRead | None:
