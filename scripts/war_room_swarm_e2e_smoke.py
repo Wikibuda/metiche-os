@@ -4,7 +4,7 @@ import httpx
 
 
 def main() -> None:
-    base = "http://127.0.0.1:5163"
+    base = "http://127.0.0.1:5063"
     with httpx.Client(timeout=15.0) as client:
         html = client.get(f"{base}/swarm-console.html")
         assert html.status_code == 200, html.text

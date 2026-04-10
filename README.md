@@ -323,6 +323,7 @@ Para cerrar la fase de diseño tecnico antes de implementar control de enjambres
   - `Swarm.json`
   - `task_events.json`
 - Checklist DoD y guia de ejecucion: `docs/week1/README.md`
+- Baseline de cierre Semana 2: `docs/week2/README.md`
 
 Cobertura del pack:
 
@@ -330,6 +331,19 @@ Cobertura del pack:
 - Extension `memory_entries` Opcion B (`source`, `related_channel`, `client_key`, `correlation_id`).
 - Indices de trazabilidad y continuidad multicanal.
 - Catalogo de eventos de enjambre (`task_events`) con severidad y campos requeridos.
+
+## Semana 2 Baseline
+
+Estado de cierre documentado en:
+
+- `docs/week2/README.md`
+
+Incluye:
+
+- Alcance operativo cerrado de `swarm_controller`.
+- Evidencia E2E (`create -> run -> history`) con consola de enjambres.
+- Compatibilidad de rutas (`/admin-dashboard.html` y `/swarm-console.html`).
+- Persistencia de tema compartido (`warroom_theme`) entre War Room y consola.
 
 ## Arranque Consolidado
 
