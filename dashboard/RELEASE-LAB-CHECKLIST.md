@@ -7,7 +7,8 @@ Validar que el dashboard lab está listo antes de crear tag de release.
 ## URLs clave
 
 - Interfaz: `http://127.0.0.1:5063/lab`
-- Alias: `http://127.0.0.1:5063/` y `http://127.0.0.1:5063/admin-dashboard.html`
+- Alias: `http://127.0.0.1:5063/`
+- Consola de enjambres: `http://127.0.0.1:5063/swarm-console.html`
 - Swagger metiche-os: `http://127.0.0.1:8091/docs`
 - OpenAPI: `http://127.0.0.1:8091/openapi.json`
 

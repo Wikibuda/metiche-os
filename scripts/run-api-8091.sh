@@ -25,6 +25,9 @@ fi
 echo "Iniciando metiche-os API en http://${HOST}:${PORT}"
 echo "DATABASE_URL=${DATABASE_URL}"
 echo "PROJECTIONS_ROOT=${PROJECTIONS_ROOT}"
+echo "UI operativo: http://${HOST}:${PORT}/dashboard/operativo"
+echo "UI enjambres: http://${HOST}:${PORT}/dashboard/swarm-console.html"
+echo "Docs API:     http://${HOST}:${PORT}/docs"
 
 # Ensure environment variable does not override .env
 unset SHOPIFY_ACCESS_TOKEN

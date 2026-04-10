@@ -760,7 +760,14 @@ const server = createServer(async (req, res) => {
     const requestUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
     console.log(`📡 Request: ${req.method} ${requestUrl.pathname} (host: ${req.headers.host})`);
 
-    if (req.method === "GET" && requestUrl.pathname === "/admin-dashboard.html") {
+    if (
+      req.method === "GET" &&
+      (
+        requestUrl.pathname === "/admin-dashboard.html" ||
+        requestUrl.pathname === "/admin-dashboard-lab.html" ||
+        requestUrl.pathname === "/swarm-console.html"
+      )
+    ) {
       const html = await loadDashboardHtml(ADMIN_DASHBOARD_FILE);
       sendHtml(res, html);
       return;
