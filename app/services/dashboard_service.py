@@ -238,7 +238,7 @@ def list_dashboard_tasks(
     task_id_query: str | None = None,
     limit: int = 120,
 ) -> dict[str, Any]:
-    safe_limit = max(20, min(limit, 400))
+    safe_limit = max(1, min(limit, 400))
     query = select(Task).order_by(Task.updated_at.desc())
     tasks = session.exec(query).all()[:safe_limit]
 

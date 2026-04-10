@@ -71,7 +71,7 @@ def get_dashboard_tasks_route(
     status: str | None = None,
     priority: str | None = None,
     q: str | None = None,
-    limit: int = Query(default=120, ge=20, le=400),
+    limit: int = Query(default=120, ge=1, le=400),
     session: Session = Depends(get_session),
 ) -> dict:
     return list_dashboard_tasks(
