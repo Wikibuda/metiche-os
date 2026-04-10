@@ -122,6 +122,35 @@
             padding: 10px;
         }
 
+        body.swarm-console-mode .detail-card {
+            background: var(--wr-panel-soft);
+            border: 1px solid var(--wr-border);
+        }
+
+        body.swarm-console-mode .detail-card h3 {
+            color: var(--wr-brand);
+        }
+
+        body.swarm-console-mode .detail-item {
+            background: var(--wr-panel);
+            border: 1px solid var(--wr-border);
+        }
+
+        body.swarm-console-mode .detail-key {
+            color: var(--wr-muted);
+        }
+
+        body.swarm-console-mode .detail-value {
+            color: var(--wr-text);
+        }
+
+        body.swarm-console-mode .detail-json,
+        body.swarm-console-mode .code-block {
+            background: var(--wr-panel-soft);
+            border: 1px solid var(--wr-border);
+            color: var(--wr-text);
+        }
+
         .swarm-console-header {
             background: var(--wr-panel);
             border: 1px solid var(--wr-border);
@@ -711,8 +740,8 @@
                     </select>
                 </div>
                 <div class="kv-item">
-                    <div class="kv-key">Members (coma separada)</div>
-                    <input class="input" id="swarm-members" placeholder="whatsapp, shopify" value="whatsapp, shopify" />
+                    <div class="kv-key">Agents (coma separada)</div>
+                    <input class="input" id="swarm-agents" placeholder="whatsapp, shopify" value="whatsapp, shopify" />
                 </div>
                 <div class="kv-item">
                     <div class="kv-key">Max cycles</div>
@@ -745,7 +774,7 @@
                         <thead>
                             <tr>
                                 <th>Nombre</th>
-                                <th>Members</th>
+                                <th>Agents</th>
                                 <th>Policy</th>
                                 <th>Estado</th>
                                 <th>Actualizado</th>
@@ -840,6 +869,12 @@
                 const value = String(taskId || "").trim();
                 if (!value) return;
                 localStorage.setItem(TASK_ID_STORAGE_KEY, value);
+            } catch {}
+        }
+
+        function clearPersistedTaskId() {
+            try {
+                localStorage.removeItem(TASK_ID_STORAGE_KEY);
             } catch {}
         }
 
@@ -1089,7 +1124,7 @@
             return "warn";
         }
 
-        function parseSwarmMembers(input) {
+        function parseSwarmAgents(input) {
             const raw = String(input || "").trim();
             if (!raw) return [];
             const pieces = raw.split(",").map((item) => item.trim().toLowerCase()).filter(Boolean);
@@ -1159,12 +1194,12 @@
             const name = document.getElementById("swarm-name").value.trim();
             const goal = document.getElementById("swarm-goal").value.trim();
             const policy = document.getElementById("swarm-policy").value;
-            const members = parseSwarmMembers(document.getElementById("swarm-members").value);
+            const agents = parseSwarmAgents(document.getElementById("swarm-agents").value);
             const objective = document.getElementById("swarm-objective").value.trim();
             const maxCycles = Number(document.getElementById("swarm-max-cycles").value || 1);
 
-            if (!name || !goal || !members.length) {
-                setAlert("swarm-launch-alert", "warn", "Completa name, goal y members antes de ejecutar.");
+            if (!name || !goal || !agents.length) {
+                setAlert("swarm-launch-alert", "warn", "Completa name, goal y agents antes de ejecutar.");
                 return;
             }
 
@@ -1179,7 +1214,7 @@
                         name,
                         goal,
                         policy,
-                        agents: members
+                        agents
                     })
                 });
                 setSwarmActionNote(`Swarm creado (${created.id?.slice(0, 8)}…), ejecutando...`);
@@ -1232,6 +1267,20 @@
                 renderCurrentDetailView();
             } catch (error) {
                 document.getElementById("detail-meta").textContent = "No se pudo cargar el detalle";
+                const message = String(error?.message || "");
+                const taskMissing = /tarea no encontrada|http 404/i.test(message);
+                if (taskMissing) {
+                    const input = document.getElementById("task-id-input");
+                    if (input?.value?.trim() === cleanTaskId) {
+                        input.value = "";
+                    }
+                    clearPersistedTaskId();
+                    currentDetailPayload = null;
+                    updateDetailApiLinks("");
+                    renderCurrentDetailView();
+                    setAlert("detail-alert", "warn", "La tarea ya no existe. Se limpió el taskId guardado para evitar reintentos automáticos.");
+                    return;
+                }
                 setAlert("detail-alert", "error", `Detalle no disponible: ${error.message}`);
             }
         }
