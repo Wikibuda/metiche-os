@@ -11,11 +11,13 @@ def main() -> None:
     if db_path.exists():
         db_path.unlink()
     os.environ["DATABASE_URL"] = f"sqlite:///{db_path}"
+    os.environ["WHATSAPP_ALLOWED_NUMBERS"] = "+5210000000000,+5210000000001"
+    os.environ["WHATSAPP_SANDBOX_MODE"] = "true"
 
     from app.integrations.whatsapp_adapter import WhatsAppAdapter
     from app.main import app
 
-    client_key = "+5210000000000"
+    client_key = "+5210000000001"
     objective = "Mensaje de prueba del enjambre para confirmar entrega"
     original_send = WhatsAppAdapter.send_message
     send_counter = {"calls": 0}

@@ -43,6 +43,8 @@ class Settings(BaseSettings):
     whatsapp_access_token: str = ""
     whatsapp_gateway_port: str = ""
     whatsapp_business_number: str = ""
+    whatsapp_allowed_numbers: str = "+5210000000000,+5210000000001"
+    whatsapp_sandbox_mode: bool = True
     dashboard_health_url: str = ""
     dashboard_health_token: str = ""
     dashboard_port: str = ""
