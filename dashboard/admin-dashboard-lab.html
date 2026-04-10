@@ -585,7 +585,7 @@
             </article>
         </section>
 
-        <section class="panel" id="swarm-launch-panel">
+        <section class="panel" id="legacy-ops-panel">
             <h2>Estado operativo</h2>
             <div class="meta" id="generated-at">Actualizando…</div>
             <div class="kv">
@@ -612,7 +612,7 @@
             </div>
         </section>
 
-        <section class="panel" id="swarm-history-panel">
+        <section class="panel" id="legacy-recent-panel">
             <h2>Tareas recientes del laboratorio</h2>
             <div class="controls">
                 <input class="input" id="task-id-input" placeholder="Pega task_id para ver detalle" />
@@ -637,7 +637,7 @@
             </table>
         </section>
 
-        <section class="panel">
+        <section class="panel" id="swarm-launch-panel">
             <h2>Detalle de tarea</h2>
             <div class="alert hidden" id="detail-alert"></div>
             <div class="meta" id="detail-meta">Selecciona una tarea para consultar route, dispatch, escalation y flow.</div>
@@ -693,7 +693,7 @@
             </details>
         </section>
 
-        <section class="panel">
+        <section class="panel" id="swarm-history-panel">
             <h2>Lanzar Enjambre</h2>
             <div class="alert hidden" id="swarm-launch-alert"></div>
             <div class="meta">Crea y ejecuta un enjambre en un solo flujo: `POST /swarm` y luego `POST /swarm/{id}/run`.</div>
@@ -736,7 +736,7 @@
             </div>
         </section>
 
-        <section class="panel">
+        <section class="panel" id="legacy-detail-panel">
             <h2>Enjambres Recientes</h2>
             <div class="split-panels">
                 <div>

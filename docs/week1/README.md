@@ -94,3 +94,7 @@ Archivo: `app/sql/migrations/week1/seed_week1.sql`
 - `memory_entries` ya soporta continuidad multicanal por `client_key` y `related_channel`.
 - `swarm_votes.argument` habilita politica `narrative-consensus`.
 - IDs normalizados en formato UUID.
+
+Estado de cierre de Semana 2:
+
+- Ver `docs/week2/README.md` como baseline operativa oficial.
