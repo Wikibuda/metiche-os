@@ -7,6 +7,7 @@ from app.core.config import settings
 from app.domain.narrative.models import NarrativeEntry
 from app.domain.rules import Rule
 from app.domain.soul.models import Actor, CanonicalPhrase, SoulProfile
+from app.domain.swarm.models import Swarm, SwarmAgent, SwarmCycle, SwarmVote
 from app.domain.tasks.models import Decision, EngineDispatch, Execution, QueueEntry, RouteResolution, Task, Validation
 
 engine = create_engine(settings.database_url, connect_args={"check_same_thread": False})

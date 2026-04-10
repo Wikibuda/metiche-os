@@ -8,6 +8,7 @@ from app.api.routes_memory import router as memory_router
 from app.api.routes_narrative import router as narrative_router
 from app.api.routes_rules import router as rules_router
 from app.api.routes_soul import router as soul_router
+from app.api.routes_swarm import router as swarm_router
 from app.api.routes_tasks import router as tasks_router
 from app.bootstrap.seed_core import seed_core_data
 from app.core.db import create_db_and_tables
@@ -28,3 +29,4 @@ app.include_router(narrative_router)
 app.include_router(memory_router)
 app.include_router(rules_router)
 app.include_router(dashboard_router)
+app.include_router(swarm_router)
