@@ -6,8 +6,10 @@ COMPOSE_FILE="${ROOT_DIR}/docker-compose.yml"
 COMPOSE_PROJECT="${COMPOSE_PROJECT:-metiche-os}"
 API_URL="${API_URL:-http://127.0.0.1:8091/health}"
 DASHBOARD_PORT="${DASHBOARD_PORT:-5063}"
-DASHBOARD_URL="http://127.0.0.1:${DASHBOARD_PORT}/admin-dashboard.html"
+METICHE_OS_BASE="${METICHE_OS_BASE:-http://127.0.0.1:8091}"
+DASHBOARD_OPERATIVO_URL="http://127.0.0.1:${DASHBOARD_PORT}/"
 DASHBOARD_OVERVIEW_URL="http://127.0.0.1:${DASHBOARD_PORT}/api/labs/metiche-os/overview"
+DASHBOARD_SWARM_URL="http://127.0.0.1:${DASHBOARD_PORT}/swarm-console.html"
 DASHBOARD_PID_FILE="${ROOT_DIR}/.dashboard-5063.pid"
 DASHBOARD_LOG_FILE="${ROOT_DIR}/data/dashboard-5063.log"
 
@@ -58,7 +60,7 @@ fi
 
 (
   cd "${ROOT_DIR}"
-  nohup env DASHBOARD_PORT="${DASHBOARD_PORT}" node dashboard/dashboard-server.mjs \
+  nohup env DASHBOARD_PORT="${DASHBOARD_PORT}" METICHE_OS_BASE="${METICHE_OS_BASE}" node dashboard/dashboard-server.mjs \
     > "${DASHBOARD_LOG_FILE}" 2>&1 &
   echo $! > "${DASHBOARD_PID_FILE}"
 )
@@ -74,9 +76,15 @@ if ! wait_http_200 "${DASHBOARD_OVERVIEW_URL}" 45 1; then
   exit 1
 fi
 
+if ! wait_http_200 "${DASHBOARD_SWARM_URL}" 45 1; then
+  echo "Consola de enjambres no respondió OK en ${DASHBOARD_SWARM_URL}"
+  exit 1
+fi
+
 echo ""
 echo "Stack consolidado arriba:"
 echo "- API:       http://127.0.0.1:8091/docs"
-echo "- Dashboard: ${DASHBOARD_URL}"
+echo "- Operativo: ${DASHBOARD_OPERATIVO_URL}"
+echo "- Enjambres: ${DASHBOARD_SWARM_URL}"
 echo "- Logs dash: ${DASHBOARD_LOG_FILE}"
 echo "- PID dash:  ${DASHBOARD_PID_FILE}"

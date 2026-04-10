@@ -19,9 +19,147 @@
             padding: 24px;
         }
 
+        :root {
+            --wr-bg: #0b1020;
+            --wr-panel: #121a2f;
+            --wr-panel-soft: #18233e;
+            --wr-text: #e8edf7;
+            --wr-muted: #9ba9c7;
+            --wr-ok: #2dd36f;
+            --wr-warn: #ffd166;
+            --wr-bad: #ff5f6d;
+            --wr-brand: #6ea8fe;
+            --wr-border: #263251;
+        }
+
+        body.light {
+            --wr-bg: #f5f7fb;
+            --wr-panel: #ffffff;
+            --wr-panel-soft: #f3f5fb;
+            --wr-text: #1b2540;
+            --wr-muted: #5f6f91;
+            --wr-ok: #14a44d;
+            --wr-warn: #d08d00;
+            --wr-bad: #cb2b3e;
+            --wr-brand: #2f6fed;
+            --wr-border: #d7deee;
+        }
+
+        body.swarm-console-mode {
+            background: var(--wr-bg);
+            color: var(--wr-text);
+            padding: 14px;
+        }
+
         .container {
             margin: 0 auto;
             max-width: 1200px;
+        }
+
+        body.swarm-console-mode .container {
+            max-width: 1360px;
+        }
+
+        body.swarm-console-mode .hero,
+        body.swarm-console-mode .grid,
+        body.swarm-console-mode .footer {
+            display: none;
+        }
+
+        body.swarm-console-mode .panel {
+            background: var(--wr-panel);
+            border: 1px solid var(--wr-border);
+            border-radius: 10px;
+            box-shadow: none;
+            margin-bottom: 12px;
+            padding: 12px;
+        }
+
+        body.swarm-console-mode .panel h2 {
+            font-size: 15px;
+            margin-bottom: 10px;
+        }
+
+        body.swarm-console-mode .input {
+            background: var(--wr-panel-soft);
+            border: 1px solid var(--wr-border);
+            border-radius: 8px;
+            color: var(--wr-text);
+            min-width: 220px;
+            padding: 8px;
+        }
+
+        body.swarm-console-mode .meta,
+        body.swarm-console-mode .kv-key,
+        body.swarm-console-mode .action-note {
+            color: var(--wr-muted);
+        }
+
+        body.swarm-console-mode th {
+            color: var(--wr-brand);
+        }
+
+        body.swarm-console-mode td,
+        body.swarm-console-mode .panel h2,
+        body.swarm-console-mode .kv-value {
+            color: var(--wr-text);
+        }
+
+        body.swarm-console-mode .btn {
+            background: var(--wr-brand);
+            color: #ffffff;
+        }
+
+        body.swarm-console-mode .btn.secondary {
+            background: transparent;
+            border: 1px solid var(--wr-border);
+            color: var(--wr-text);
+        }
+
+        body.swarm-console-mode .kv-item {
+            background: var(--wr-panel-soft);
+            border-radius: 10px;
+            padding: 10px;
+        }
+
+        .swarm-console-header {
+            background: var(--wr-panel);
+            border: 1px solid var(--wr-border);
+            border-radius: 10px;
+            display: flex;
+            gap: 10px;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding: 10px 12px;
+        }
+
+        .swarm-console-headcopy {
+            min-width: 0;
+        }
+
+        .swarm-console-title {
+            color: var(--wr-text);
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .swarm-console-subtitle {
+            color: var(--wr-muted);
+            font-size: 12px;
+        }
+
+        .swarm-theme-toggle {
+            background: transparent;
+            border: 1px solid var(--wr-border);
+            border-radius: 8px;
+            color: var(--wr-text);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 6px 10px;
+            white-space: nowrap;
+            width: auto;
         }
 
         .hero {
@@ -447,7 +585,7 @@
             </article>
         </section>
 
-        <section class="panel">
+        <section class="panel" id="swarm-launch-panel">
             <h2>Estado operativo</h2>
             <div class="meta" id="generated-at">Actualizando…</div>
             <div class="kv">
@@ -474,7 +612,7 @@
             </div>
         </section>
 
-        <section class="panel">
+        <section class="panel" id="swarm-history-panel">
             <h2>Tareas recientes del laboratorio</h2>
             <div class="controls">
                 <input class="input" id="task-id-input" placeholder="Pega task_id para ver detalle" />
@@ -1137,6 +1275,64 @@
                 return false;
             }
         }
+
+        function isSwarmConsoleMode() {
+            const params = new URLSearchParams(window.location.search || "");
+            return (
+                params.get("view") === "swarm" ||
+                window.location.pathname.endsWith("/swarm-console.html") ||
+                window.location.pathname.endsWith("/admin-dashboard.html")
+            );
+        }
+
+        function applySwarmConsoleMode() {
+            if (!isSwarmConsoleMode()) return;
+            const setTheme = (theme) => {
+                const normalized = theme === "light" ? "light" : "dark";
+                document.body.classList.toggle("light", normalized === "light");
+                localStorage.setItem("warroom_theme", normalized);
+                const toggleBtn = document.getElementById("swarm-theme-toggle");
+                if (toggleBtn) {
+                    toggleBtn.textContent = normalized === "light" ? "Tema: Claro" : "Tema: Oscuro";
+                }
+            };
+
+            const theme = localStorage.getItem("warroom_theme") || "dark";
+            setTheme(theme);
+            document.body.classList.add("swarm-console-mode");
+            const visiblePanels = new Set(["swarm-launch-panel", "swarm-history-panel"]);
+            document.querySelectorAll("section.panel").forEach((panel) => {
+                if (!(panel instanceof HTMLElement)) return;
+                if (!visiblePanels.has(panel.id)) {
+                    panel.style.display = "none";
+                }
+            });
+            document.title = "War Room Operativo · Consola de Enjambres";
+            const container = document.querySelector(".container");
+            if (container && !document.getElementById("swarm-console-header")) {
+                const header = document.createElement("section");
+                header.id = "swarm-console-header";
+                header.className = "swarm-console-header";
+                header.innerHTML = `
+                    <div class="swarm-console-headcopy">
+                        <div class="swarm-console-title">War Room Operativo · Consola de Enjambres</div>
+                        <div class="swarm-console-subtitle">Ejecución real de swarms: crear, correr, listar estado e historial completo.</div>
+                    </div>
+                    <button id="swarm-theme-toggle" class="swarm-theme-toggle" type="button">Tema: Oscuro</button>
+                `;
+                container.prepend(header);
+                const toggle = document.getElementById("swarm-theme-toggle");
+                if (toggle) {
+                    toggle.addEventListener("click", () => {
+                        const isLight = document.body.classList.contains("light");
+                        setTheme(isLight ? "dark" : "light");
+                    });
+                }
+            }
+            setTheme(localStorage.getItem("warroom_theme") || "dark");
+        }
+
+        applySwarmConsoleMode();
 
         const restoredTaskId = loadPersistedTaskId();
         if (restoredTaskId) {

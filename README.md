@@ -126,7 +126,7 @@ graph TD
 
   subgraph DASHBOARD[Dashboard]
     direction TB
-    D1[dashboard/admin-dashboard-lab.html]
+    D1[dashboard/admin-dashboard-lab.html (modo swarm)]
     D2[dashboard/dashboard-server.mjs]
   end
 
@@ -343,14 +343,15 @@ El script realiza:
 
 - `docker compose up -d --build app worker` bajo proyecto `metiche-os`.
 - Reinicio limpio del dashboard en `5063` con `dashboard/dashboard-server.mjs`.
-- Validación de salud en API (`8091`) y dashboard lab (`5063`).
+- Validación de salud en API (`8091`) y consola de enjambres (`5063`).
 
 URLs:
 
 - API docs: `http://127.0.0.1:8091/docs`
-- Dashboard lab: `http://127.0.0.1:5063/admin-dashboard.html`
+- Consola de enjambres: `http://127.0.0.1:5063/swarm-console.html`
 - War Room: `http://127.0.0.1:5063/operativo.html`
 - War Room (FastAPI): `http://127.0.0.1:8091/dashboard/operativo`
+- Enjambres (FastAPI): `http://127.0.0.1:8091/dashboard/swarm-console.html`
 
 Artefactos generados:
 
@@ -474,7 +475,7 @@ Endpoints:
 
 URLs principales:
 
-- `http://127.0.0.1:5063/admin-dashboard.html`
+- `http://127.0.0.1:5063/swarm-console.html`
 - `http://127.0.0.1:5063/operativo.html`
 - `http://127.0.0.1:8091/dashboard/operativo`
 

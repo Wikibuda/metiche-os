@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.responses import RedirectResponse
 
 from app.api.routes_dashboard import router as dashboard_router
 from app.api.routes_health import router as health_router
@@ -30,3 +31,8 @@ app.include_router(memory_router)
 app.include_router(rules_router)
 app.include_router(dashboard_router)
 app.include_router(swarm_router)
+
+
+@app.get("/admin-dashboard.html", include_in_schema=False)
+def admin_dashboard_alias() -> RedirectResponse:
+    return RedirectResponse(url="/dashboard/swarm-console.html", status_code=307)
