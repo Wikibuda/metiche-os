@@ -26,4 +26,7 @@ echo "Iniciando metiche-os API en http://${HOST}:${PORT}"
 echo "DATABASE_URL=${DATABASE_URL}"
 echo "PROJECTIONS_ROOT=${PROJECTIONS_ROOT}"
 
-exec "${UVICORN_BIN}" app.main:app --host "${HOST}" --port "${PORT}" --reload
+# Ensure environment variable does not override .env
+unset SHOPIFY_ACCESS_TOKEN
+
+exec "${UVICORN_BIN}" app.main:app --host "${HOST}" --port "${PORT}"
