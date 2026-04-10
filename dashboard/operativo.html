@@ -41,7 +41,7 @@
     .wrap { padding: 14px; }
     .topbar {
       display: grid;
-      grid-template-columns: repeat(5, minmax(120px, 1fr));
+      grid-template-columns: repeat(6, minmax(120px, 1fr));
       gap: 10px;
       margin-bottom: 12px;
     }
@@ -177,6 +177,47 @@
       cursor: pointer;
       font-size: 12px;
     }
+    .memory-section { margin-top: 12px; }
+    .memory-item {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px;
+      margin-bottom: 6px;
+      background: var(--panel-soft);
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .event-badge {
+      border-radius: 999px;
+      font-size: 11px;
+      padding: 2px 8px;
+      border: 1px solid transparent;
+      display: inline-block;
+    }
+    .event-badge.clickable { cursor: pointer; user-select: none; }
+    .event-badge.active-filter { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.22) inset; transform: translateY(-1px); }
+    .ev-learning { background: rgba(110, 168, 254, 0.14); color: #8ab8ff; border-color: rgba(110, 168, 254, 0.45); }
+    .ev-decision { background: rgba(255, 209, 102, 0.14); color: #ffd166; border-color: rgba(255, 209, 102, 0.45); }
+    .ev-error { background: rgba(255, 95, 109, 0.14); color: #ff8c95; border-color: rgba(255, 95, 109, 0.45); }
+    .ev-milestone { background: rgba(45, 211, 111, 0.14); color: #84f3b2; border-color: rgba(45, 211, 111, 0.45); }
+    .wonder-chip {
+      background: rgba(110, 168, 254, 0.12);
+      border: 1px solid rgba(110, 168, 254, 0.45);
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 11px;
+      color: #8ab8ff;
+      display: inline-block;
+    }
+    .memory-stats {
+      margin-top: 6px;
+      margin-bottom: 8px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--panel-soft);
+      padding: 8px;
+      font-size: 12px;
+    }
     .alerts {
       margin-top: 8px;
       font-size: 12px;
@@ -209,7 +250,7 @@
     pre { white-space: pre-wrap; word-break: break-word; margin: 0; font-size: 12px; }
     @media (max-width: 1220px) {
       .layout { grid-template-columns: 1fr; }
-      .topbar { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+      .topbar { grid-template-columns: repeat(3, minmax(120px, 1fr)); }
       .board { grid-template-columns: repeat(2, minmax(170px, 1fr)); }
       .filters { grid-template-columns: repeat(2, 1fr); }
     }
@@ -223,6 +264,7 @@
       <div class="kpi"><div class="label">Latencia Ciclo</div><div class="value" id="kpi-latency">-</div></div>
       <div class="kpi"><div class="label">Alertas Críticas</div><div class="value" id="kpi-alerts">0</div></div>
       <div class="kpi"><div class="label">Último Tick Worker</div><div class="value" id="kpi-tick">-</div></div>
+      <div class="kpi"><div class="label">Memoria Total</div><div class="value" id="kpi-memory-total">0</div></div>
     </section>
 
     <div class="alerts" id="top-alerts"></div>
@@ -255,6 +297,39 @@
           <button id="quick-run-btn">Ejecutar</button>
         </div>
         <div class="small" id="quick-run-status">Listo.</div>
+
+        <hr style="border-color: var(--border); margin: 10px 0;">
+        <h2>Registrar Memoria</h2>
+        <form id="memory-form">
+          <div class="field">
+            <label for="mem-title">Título *</label>
+            <input id="mem-title" required placeholder="Ej. Lección de validación Plane" />
+          </div>
+          <div class="field">
+            <label for="mem-content">Contenido *</label>
+            <textarea id="mem-content" required placeholder="Qué aprendimos / decidimos / falló"></textarea>
+          </div>
+          <div class="field row">
+            <div>
+              <label for="mem-type">Tipo de evento</label>
+              <select id="mem-type">
+                <option value="learning" selected>learning</option>
+                <option value="decision">decision</option>
+                <option value="error">error</option>
+                <option value="milestone">milestone</option>
+              </select>
+            </div>
+            <div>
+              <label for="mem-wonder">Asombro (1-5)</label>
+              <input id="mem-wonder" type="range" min="1" max="5" step="1" value="3" />
+              <div class="small" id="mem-wonder-label">3</div>
+            </div>
+          </div>
+          <div class="field">
+            <button id="memory-submit-btn" type="submit">Registrar en memoria</button>
+          </div>
+          <div class="small" id="memory-submit-status">Listo.</div>
+        </form>
 
         <div class="validators">
           <h2>Estado de Validadores</h2>
@@ -302,6 +377,11 @@
         <div class="chronicles">
           <h2>Últimas Crónicas</h2>
           <div id="chronicles-list"></div>
+        </div>
+        <div class="memory-section">
+          <h2>Memoria Reciente</h2>
+          <div id="memory-stats" class="memory-stats">Cargando estadísticas...</div>
+          <div id="memory-list"></div>
         </div>
       </main>
 
@@ -382,6 +462,11 @@
       selectedTaskId: null,
       selectedTaskDetail: null,
       refreshMs: 4000,
+      memoryRefreshMs: 45000,
+      lastMemoryRefreshAt: 0,
+      memoryEntries: [],
+      memoryStats: null,
+      memoryFilterType: "",
       retryingThreshold: 2,
       blockingThreshold: 3,
       timer: null
@@ -403,6 +488,10 @@
       return document.getElementById(id);
     }
 
+    function memoryApiBase() {
+      return "";
+    }
+
     async function fetchJson(url, options = {}) {
       const response = await fetch(url, options);
       if (!response.ok) {
@@ -412,12 +501,31 @@
       return response.json();
     }
 
+    async function fetchMemoryJson(path, options = {}) {
+      const base = memoryApiBase().replace(/\/$/, "");
+      const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+      return fetchJson(`${base}${normalizedPath}`, options);
+    }
+
     async function postJson(url, payload) {
       return fetchJson(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload || {})
       });
+    }
+
+    function eventMeta(eventType) {
+      const value = String(eventType || "").toLowerCase();
+      if (value === "decision") return { cls: "ev-decision", icon: "⚖", label: "decision" };
+      if (value === "error") return { cls: "ev-error", icon: "⚠", label: "error" };
+      if (value === "milestone") return { cls: "ev-milestone", icon: "✓", label: "milestone" };
+      return { cls: "ev-learning", icon: "📘", label: value || "learning" };
+    }
+
+    function wonderText(level) {
+      const safe = Math.max(1, Math.min(5, Number(level || 1)));
+      return "⭐".repeat(safe);
     }
 
     function setTopAlerts(alerts) {
@@ -525,6 +633,130 @@
       qs("kpi-alerts").textContent = String(stats.active_critical_alerts || 0);
       qs("kpi-tick").textContent = fmtDate(stats.last_worker_tick);
       setTopAlerts(stats.alerts || []);
+    }
+
+    function applyMemoryStats(stats) {
+      const safeStats = stats || { total_entries: 0, by_event_type: {} };
+      const byType = safeStats.by_event_type || {};
+      const chips = ["learning", "decision", "error", "milestone"]
+        .map((type) => {
+          const meta = eventMeta(type);
+          const count = byType[type] || 0;
+          const activeClass = state.memoryFilterType === type ? "active-filter" : "";
+          return `<span class="event-badge clickable ${meta.cls} ${activeClass}" data-memory-filter="${type}" style="margin-right:6px;">${meta.icon} ${type}: ${count}</span>`;
+        })
+        .join("");
+      const allActiveClass = !state.memoryFilterType ? "active-filter" : "";
+      qs("kpi-memory-total").textContent = String(safeStats.total_entries || 0);
+      qs("memory-stats").innerHTML = `
+        <div><strong>Total:</strong> ${safeStats.total_entries || 0}</div>
+        <div style="margin-top:6px;">
+          <span class="event-badge clickable ${allActiveClass}" data-memory-filter="" style="margin-right:6px;">Todos</span>
+          ${chips}
+        </div>
+      `;
+      qs("memory-stats").querySelectorAll("[data-memory-filter]").forEach((el) => {
+        el.addEventListener("click", () => {
+          state.memoryFilterType = el.getAttribute("data-memory-filter") || "";
+          applyMemoryStats(state.memoryStats);
+          renderMemory(state.memoryEntries);
+        });
+      });
+    }
+
+    function renderMemory(entries) {
+      const host = qs("memory-list");
+      const rawItems = Array.isArray(entries) ? entries : [];
+      const items = state.memoryFilterType
+        ? rawItems.filter((item) => String(item.event_type || "").toLowerCase() === state.memoryFilterType)
+        : rawItems;
+      if (!items.length) {
+        const label = state.memoryFilterType ? ` del tipo ${state.memoryFilterType}` : "";
+        host.innerHTML = `<div class="small">Sin entradas de memoria recientes${label}.</div>`;
+        return;
+      }
+      host.innerHTML = items.map((item) => {
+        const meta = eventMeta(item.event_type);
+        return `
+          <div class="memory-item" data-memory-id="${item.id}">
+            <div class="row" style="align-items:flex-start;">
+              <div><strong>${item.title || "(sin título)"}</strong></div>
+              <span class="event-badge ${meta.cls}">${meta.icon} ${meta.label}</span>
+            </div>
+            <div class="row" style="margin-top:6px;">
+              <span class="wonder-chip">${wonderText(item.wonder_level)} (${item.wonder_level || 1})</span>
+              <span class="small">${fmtDate(item.created_at)}</span>
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      host.querySelectorAll(".memory-item").forEach((el) => {
+        el.addEventListener("click", () => {
+          const id = el.getAttribute("data-memory-id");
+          const match = items.find((row) => row.id === id);
+          openModal(match?.title || "Memoria", match?.content || "Sin contenido");
+        });
+      });
+    }
+
+    async function refreshMemory(force = false) {
+      const now = Date.now();
+      if (!force && now - state.lastMemoryRefreshAt < state.memoryRefreshMs) return;
+      try {
+        const [entries, stats] = await Promise.all([
+          fetchMemoryJson("/memory/?limit=5"),
+          fetchMemoryJson("/memory/stats")
+        ]);
+        const sortedEntries = [...(entries || [])].sort((a, b) => {
+          const timeA = new Date(a.created_at || 0).getTime();
+          const timeB = new Date(b.created_at || 0).getTime();
+          return timeB - timeA;
+        });
+        state.memoryEntries = sortedEntries;
+        state.memoryStats = stats;
+        state.lastMemoryRefreshAt = now;
+        renderMemory(sortedEntries);
+        applyMemoryStats(stats);
+      } catch (error) {
+        console.error("Error cargando memoria:", error);
+        qs("memory-list").innerHTML = '<div class="small">No se pudo cargar memoria.</div>';
+        qs("memory-stats").textContent = "Error consultando estadísticas de memoria.";
+      }
+    }
+
+    async function submitMemory(event) {
+      event.preventDefault();
+      const title = qs("mem-title").value.trim();
+      const content = qs("mem-content").value.trim();
+      if (!title || !content) {
+        qs("memory-submit-status").textContent = "Título y contenido son obligatorios.";
+        return;
+      }
+      const payload = {
+        title,
+        content,
+        event_type: qs("mem-type").value,
+        wonder_level: Number(qs("mem-wonder").value || 3)
+      };
+      qs("memory-submit-status").textContent = "Registrando...";
+      try {
+        await fetchMemoryJson("/memory/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        qs("memory-submit-status").textContent = "Entrada registrada.";
+        qs("mem-title").value = "";
+        qs("mem-content").value = "";
+        qs("mem-type").value = "learning";
+        qs("mem-wonder").value = "3";
+        qs("mem-wonder-label").textContent = "3";
+        await refreshMemory(true);
+      } catch (error) {
+        console.error("Error registrando memoria:", error);
+        qs("memory-submit-status").textContent = "Error al registrar memoria.";
+      }
     }
 
     function bindTaskCardEvents() {
@@ -692,6 +924,7 @@
         renderBoard(tasksResp);
         renderValidators(validatorsResp);
         renderChronicles(narrativesResp);
+        await refreshMemory(false);
         if (state.selectedTaskId) {
           const stillExists = state.tasks.find((item) => item.task_id === state.selectedTaskId);
           if (stillExists) {
@@ -712,6 +945,10 @@
 
     function wireEvents() {
       qs("quick-run-btn").addEventListener("click", runQuickTask);
+      qs("memory-form").addEventListener("submit", submitMemory);
+      qs("mem-wonder").addEventListener("input", () => {
+        qs("mem-wonder-label").textContent = String(qs("mem-wonder").value);
+      });
       qs("modal-close").addEventListener("click", closeModal);
       qs("modal").addEventListener("click", (event) => {
         if (event.target.id === "modal") closeModal();
@@ -750,6 +987,7 @@
       applyTheme(savedTheme);
       wireEvents();
       await refreshAll();
+      await refreshMemory(true);
       restartPolling();
     }
 

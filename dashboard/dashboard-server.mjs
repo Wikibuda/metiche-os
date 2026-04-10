@@ -771,7 +771,7 @@ const server = createServer(async (req, res) => {
 
     if (
       (req.method === "GET" || req.method === "POST") &&
-      requestUrl.pathname.startsWith("/dashboard/")
+      (requestUrl.pathname.startsWith("/dashboard/") || requestUrl.pathname.startsWith("/memory"))
     ) {
       await proxyDashboardApi(req, res, requestUrl);
       return;
