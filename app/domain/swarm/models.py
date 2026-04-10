@@ -114,6 +114,33 @@ class SwarmRead(BaseModel):
         )
 
 
+class SwarmSummaryRead(BaseModel):
+    id: str
+    name: str
+    goal: str
+    policy: str
+    status: str
+    members: list[str]
+    total_agents: int
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def from_model(cls, swarm: Swarm, agents: list[SwarmAgent]) -> "SwarmSummaryRead":
+        members = [agent.agent_name for agent in agents]
+        return cls(
+            id=swarm.id,
+            name=swarm.name,
+            goal=swarm.goal,
+            policy=swarm.policy,
+            status=swarm.status,
+            members=members,
+            total_agents=len(members),
+            created_at=swarm.created_at,
+            updated_at=swarm.updated_at,
+        )
+
+
 class SwarmVoteRead(BaseModel):
     id: str
     cycle_id: str

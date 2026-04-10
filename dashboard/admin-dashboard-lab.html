@@ -139,6 +139,12 @@
             padding: 10px 12px;
         }
 
+        .input.textarea {
+            min-height: 92px;
+            resize: vertical;
+            width: 100%;
+        }
+
         .btn {
             background: #1d4ed8;
             border: 0;
@@ -355,6 +361,40 @@
             color: #fecaca;
         }
 
+        .split-panels {
+            display: grid;
+            gap: 16px;
+            grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+        }
+
+        .swarm-link {
+            background: transparent;
+            border: 0;
+            color: #bfdbfe;
+            cursor: pointer;
+            font: inherit;
+            padding: 0;
+            text-align: left;
+        }
+
+        .code-block {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            border-radius: 12px;
+            color: #cbd5e1;
+            font-size: 0.84rem;
+            max-height: 320px;
+            overflow: auto;
+            padding: 12px;
+            white-space: pre-wrap;
+        }
+
+        @media (max-width: 980px) {
+            .split-panels {
+                grid-template-columns: 1fr;
+            }
+        }
+
         .hidden {
             display: none;
         }
@@ -515,6 +555,80 @@
             </details>
         </section>
 
+        <section class="panel">
+            <h2>Lanzar Enjambre</h2>
+            <div class="alert hidden" id="swarm-launch-alert"></div>
+            <div class="meta">Crea y ejecuta un enjambre en un solo flujo: `POST /swarm` y luego `POST /swarm/{id}/run`.</div>
+            <div class="kv">
+                <div class="kv-item">
+                    <div class="kv-key">Nombre</div>
+                    <input class="input" id="swarm-name" placeholder="Ej: Enjambre Riesgo Operativo" />
+                </div>
+                <div class="kv-item">
+                    <div class="kv-key">Policy</div>
+                    <select class="input" id="swarm-policy">
+                        <option value="narrative-consensus">narrative-consensus</option>
+                        <option value="majority">majority</option>
+                        <option value="leader-follower">leader-follower</option>
+                    </select>
+                </div>
+                <div class="kv-item">
+                    <div class="kv-key">Members (coma separada)</div>
+                    <input class="input" id="swarm-members" placeholder="whatsapp, shopify" value="whatsapp, shopify" />
+                </div>
+                <div class="kv-item">
+                    <div class="kv-key">Max cycles</div>
+                    <input class="input" id="swarm-max-cycles" type="number" min="1" max="5" value="3" />
+                </div>
+            </div>
+            <div class="kv" style="margin-top: 12px;">
+                <div class="kv-item">
+                    <div class="kv-key">Goal</div>
+                    <textarea class="input textarea" id="swarm-goal" placeholder="Objetivo del enjambre">Coordinar respuesta operativa de canales ante incidencia nocturna.</textarea>
+                </div>
+                <div class="kv-item">
+                    <div class="kv-key">Objective de ejecución</div>
+                    <textarea class="input textarea" id="swarm-objective" placeholder="Objetivo puntual para run">Evaluar riesgo y definir plan de acción para whatsapp y shopify.</textarea>
+                </div>
+            </div>
+            <div class="action-row">
+                <button class="btn" id="swarm-run-btn" type="button">Ejecutar</button>
+                <button class="btn secondary" id="swarm-refresh-btn" type="button">Actualizar Enjambres</button>
+                <span class="action-note" id="swarm-action-note"></span>
+            </div>
+        </section>
+
+        <section class="panel">
+            <h2>Enjambres Recientes</h2>
+            <div class="split-panels">
+                <div>
+                    <div class="meta" id="swarm-list-meta">Cargando enjambres…</div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Members</th>
+                                <th>Policy</th>
+                                <th>Estado</th>
+                                <th>Actualizado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="swarm-recent-rows">
+                            <tr>
+                                <td colspan="5">Cargando enjambres…</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div>
+                    <h2 style="font-size: 1.05rem; margin-bottom: 10px;">Historial del Enjambre</h2>
+                    <div class="alert hidden" id="swarm-history-alert"></div>
+                    <div class="meta" id="swarm-history-meta">Selecciona un enjambre para cargar su historial completo.</div>
+                    <pre class="code-block" id="swarm-history-json">Sin historial cargado.</pre>
+                </div>
+            </div>
+        </section>
+
         <div class="footer">Preview de laboratorio independiente del dashboard productivo.</div>
     </div>
 
@@ -523,6 +637,8 @@
         let currentDetailPayload = null;
         let currentDetailView = "full";
         let refreshTimer = null;
+        let swarmRefreshTimer = null;
+        let selectedSwarmId = "";
         const TASK_ID_STORAGE_KEY = "metiche_lab_last_task_id";
 
         function formatCounts(value) {
@@ -742,11 +858,15 @@
             renderCurrentDetailView();
         }
 
-        async function fetchJsonWithTimeout(url, timeoutMs = 7000) {
+        async function fetchJsonWithTimeout(url, timeoutMs = 7000, options = {}) {
             const controller = new AbortController();
             const timer = setTimeout(() => controller.abort(), timeoutMs);
             try {
-                const response = await fetch(url, { cache: "no-store", signal: controller.signal });
+                const response = await fetch(url, {
+                    cache: "no-store",
+                    ...options,
+                    signal: controller.signal
+                });
                 const payload = await response.json().catch(() => ({}));
                 if (!response.ok) {
                     throw new Error(payload?.error || payload?.detail || `HTTP ${response.status}`);
@@ -819,6 +939,134 @@
             refreshTimer = setTimeout(() => {
                 loadDashboard();
             }, nextMs);
+        }
+
+        function setSwarmActionNote(message) {
+            document.getElementById("swarm-action-note").textContent = message || "";
+        }
+
+        function swarmStatusClass(status) {
+            if (status === "completed") return "ok";
+            if (status === "failed" || status === "cancelled") return "fail";
+            return "warn";
+        }
+
+        function parseSwarmMembers(input) {
+            const raw = String(input || "").trim();
+            if (!raw) return [];
+            const pieces = raw.split(",").map((item) => item.trim().toLowerCase()).filter(Boolean);
+            return [...new Set(pieces)];
+        }
+
+        async function loadSwarmHistory(swarmId) {
+            const cleanSwarmId = String(swarmId || "").trim();
+            if (!cleanSwarmId) return;
+            selectedSwarmId = cleanSwarmId;
+            setAlert("swarm-history-alert", null, "");
+            document.getElementById("swarm-history-meta").textContent = `Cargando historial de ${cleanSwarmId.slice(0, 8)}…`;
+            try {
+                const payload = await fetchJsonWithTimeout(`/swarm/${encodeURIComponent(cleanSwarmId)}/history`, 9000);
+                document.getElementById("swarm-history-meta").textContent =
+                    `Swarm ${payload.swarm?.name || cleanSwarmId} · ciclos: ${payload.total_cycles}`;
+                document.getElementById("swarm-history-json").textContent = JSON.stringify(payload, null, 2);
+            } catch (error) {
+                document.getElementById("swarm-history-meta").textContent = "No se pudo cargar historial";
+                setAlert("swarm-history-alert", "error", `Historial no disponible: ${error.message}`);
+            }
+        }
+
+        async function loadRecentSwarms(preferredSwarmId = "") {
+            try {
+                const rows = await fetchJsonWithTimeout("/swarm?limit=15", 9000);
+                const list = Array.isArray(rows) ? rows : [];
+                document.getElementById("swarm-list-meta").textContent = `${list.length} enjambre(s) recientes`;
+                const tbody = document.getElementById("swarm-recent-rows");
+                if (!list.length) {
+                    tbody.innerHTML = '<tr><td colspan="5">No hay enjambres recientes.</td></tr>';
+                    document.getElementById("swarm-history-meta").textContent = "Sin enjambres para mostrar historial.";
+                    return;
+                }
+                tbody.innerHTML = list.map((item) => `
+                    <tr>
+                        <td><button class="swarm-link" data-swarm-id="${escapeHtml(item.id || "")}" type="button">${escapeHtml(item.name || "-")}</button></td>
+                        <td>${escapeHtml((item.members || []).join(", ") || "-")}</td>
+                        <td>${escapeHtml(item.policy || "-")}</td>
+                        <td><span class="pill ${swarmStatusClass(item.status)}">${escapeHtml(item.status || "-")}</span></td>
+                        <td>${item.updated_at ? new Date(item.updated_at).toLocaleString("es-MX") : "-"}</td>
+                    </tr>
+                `).join("");
+                const nextSwarmId = preferredSwarmId || selectedSwarmId || list[0]?.id || "";
+                if (nextSwarmId) {
+                    await loadSwarmHistory(nextSwarmId);
+                }
+            } catch (error) {
+                document.getElementById("swarm-list-meta").textContent = "Error cargando enjambres";
+                document.getElementById("swarm-recent-rows").innerHTML =
+                    `<tr><td colspan="5">${escapeHtml(error.message)}</td></tr>`;
+                setAlert("swarm-history-alert", "warn", `No fue posible refrescar historial: ${error.message}`);
+            } finally {
+                scheduleSwarmRefresh();
+            }
+        }
+
+        function scheduleSwarmRefresh() {
+            if (swarmRefreshTimer) clearTimeout(swarmRefreshTimer);
+            swarmRefreshTimer = setTimeout(() => {
+                loadRecentSwarms(selectedSwarmId);
+            }, 12000);
+        }
+
+        async function launchSwarmFromDashboard() {
+            const runBtn = document.getElementById("swarm-run-btn");
+            const name = document.getElementById("swarm-name").value.trim();
+            const goal = document.getElementById("swarm-goal").value.trim();
+            const policy = document.getElementById("swarm-policy").value;
+            const members = parseSwarmMembers(document.getElementById("swarm-members").value);
+            const objective = document.getElementById("swarm-objective").value.trim();
+            const maxCycles = Number(document.getElementById("swarm-max-cycles").value || 1);
+
+            if (!name || !goal || !members.length) {
+                setAlert("swarm-launch-alert", "warn", "Completa name, goal y members antes de ejecutar.");
+                return;
+            }
+
+            setAlert("swarm-launch-alert", null, "");
+            setSwarmActionNote("Creando swarm...");
+            runBtn.disabled = true;
+            try {
+                const created = await fetchJsonWithTimeout("/swarm", 9000, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        name,
+                        goal,
+                        policy,
+                        agents: members
+                    })
+                });
+                setSwarmActionNote(`Swarm creado (${created.id?.slice(0, 8)}…), ejecutando...`);
+                const runData = await fetchJsonWithTimeout(`/swarm/${encodeURIComponent(created.id)}/run`, 12000, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        objective: objective || goal,
+                        max_cycles: Number.isFinite(maxCycles) ? Math.min(5, Math.max(1, maxCycles)) : 1,
+                        client_key: "dashboard-war-room"
+                    })
+                });
+                setAlert(
+                    "swarm-launch-alert",
+                    "info",
+                    `Swarm ejecutado. decision=${runData.decision}, stop_reason=${runData.stop_reason}, cycles=${runData.cycles_executed}`
+                );
+                setSwarmActionNote("Ejecución completada.");
+                await loadRecentSwarms(created.id);
+            } catch (error) {
+                setAlert("swarm-launch-alert", "error", `No se pudo ejecutar el enjambre: ${error.message}`);
+                setSwarmActionNote("Ejecución fallida.");
+            } finally {
+                runBtn.disabled = false;
+            }
         }
 
         async function loadTaskDetail(taskId) {
@@ -895,6 +1143,7 @@
             document.getElementById("task-id-input").value = restoredTaskId;
         }
         loadDashboard();
+        loadRecentSwarms();
 
         document.getElementById("load-task-detail").addEventListener("click", () => {
             const taskId = document.getElementById("task-id-input").value;
@@ -917,6 +1166,25 @@
                 const view = btn.dataset.view || "full";
                 setDetailView(view);
             });
+        });
+
+        document.getElementById("swarm-run-btn").addEventListener("click", async () => {
+            await launchSwarmFromDashboard();
+        });
+
+        document.getElementById("swarm-refresh-btn").addEventListener("click", async () => {
+            setSwarmActionNote("Actualizando lista...");
+            await loadRecentSwarms(selectedSwarmId);
+            setSwarmActionNote("Lista actualizada.");
+        });
+
+        document.getElementById("swarm-recent-rows").addEventListener("click", async (event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLElement)) return;
+            if (!target.classList.contains("swarm-link")) return;
+            const swarmId = target.dataset.swarmId || "";
+            if (!swarmId) return;
+            await loadSwarmHistory(swarmId);
         });
 
         document.getElementById("action-rerun-task").addEventListener("click", async () => {
@@ -970,6 +1238,7 @@
 
         window.addEventListener("beforeunload", () => {
             if (refreshTimer) clearTimeout(refreshTimer);
+            if (swarmRefreshTimer) clearTimeout(swarmRefreshTimer);
         });
     </script>
 </body>
