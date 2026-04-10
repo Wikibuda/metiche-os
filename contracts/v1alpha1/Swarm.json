@@ -1,0 +1,163 @@
+{
+  "contract_name": "Swarm",
+  "version": "v1alpha1",
+  "description": "Contrato para crear, ejecutar y observar enjambres multiagente.",
+  "schema": {
+    "type": "object",
+    "required": [
+      "swarm_id",
+      "name",
+      "goal",
+      "policy",
+      "status",
+      "agents",
+      "created_at"
+    ],
+    "properties": {
+      "swarm_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "name": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 255
+      },
+      "goal": {
+        "type": "string",
+        "minLength": 5,
+        "maxLength": 2000
+      },
+      "policy": {
+        "type": "string",
+        "enum": ["majority", "leader-follower", "narrative-consensus"]
+      },
+      "status": {
+        "type": "string",
+        "enum": ["created", "running", "paused", "completed", "failed", "cancelled"]
+      },
+      "parent_issue_id": {
+        "type": "string",
+        "maxLength": 255
+      },
+      "correlation_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "client_key": {
+        "type": "string",
+        "maxLength": 255
+      },
+      "agents": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 10,
+        "items": {
+          "type": "object",
+          "required": ["agent_name"],
+          "properties": {
+            "agent_name": {
+              "type": "string",
+              "enum": ["whatsapp", "telegram", "shopify", "plane", "dashboard", "deepseek"]
+            },
+            "task_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "status": {
+              "type": "string",
+              "enum": ["idle", "queued", "running", "done", "failed", "disabled"]
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "created_at": {
+        "type": "string",
+        "format": "date-time"
+      }
+    },
+    "additionalProperties": false
+  },
+  "validations": {
+    "required_fields": ["swarm_id", "name", "goal", "policy", "status", "agents", "created_at"],
+    "max_lengths": {
+      "name": 255,
+      "goal": 2000,
+      "parent_issue_id": 255,
+      "client_key": 255,
+      "swarm_votes.argument": 2000
+    },
+    "enum_fields": {
+      "policy": ["majority", "leader-follower", "narrative-consensus"],
+      "status": ["created", "running", "paused", "completed", "failed", "cancelled"],
+      "agents.agent_name": ["whatsapp", "telegram", "shopify", "plane", "dashboard", "deepseek"],
+      "agents.status": ["idle", "queued", "running", "done", "failed", "disabled"]
+    },
+    "business_rules": [
+      "Debe existir al menos un agente por enjambre.",
+      "No se permite repetir agent_name dentro del mismo enjambre.",
+      "Si policy es narrative-consensus, se recomienda registrar argumentos en swarm_votes.argument."
+    ]
+  },
+  "payload_examples": {
+    "happy_path": {
+      "swarm_id": "2f8f44f0-0d77-4c8a-8dc8-b4693a8f4c2a",
+      "name": "Swarm Inventario Omnicanal",
+      "goal": "Validar stock y continuidad WhatsApp-Telegram",
+      "policy": "narrative-consensus",
+      "status": "created",
+      "parent_issue_id": "PLN-1298",
+      "correlation_id": "67c5c524-52fa-4b7d-a4ee-9f1add3521dc",
+      "client_key": "cliente-44",
+      "agents": [
+        {
+          "agent_name": "whatsapp",
+          "status": "idle"
+        },
+        {
+          "agent_name": "shopify",
+          "status": "idle"
+        },
+        {
+          "agent_name": "telegram",
+          "status": "idle"
+        }
+      ],
+      "created_at": "2026-04-10T10:35:00Z"
+    },
+    "edge_case": {
+      "swarm_id": "be39300f-e41f-440e-b1b0-04224af2dd90",
+      "name": "Swarm Minimo",
+      "goal": "Ejecutar una prueba basica de enrutamiento.",
+      "policy": "majority",
+      "status": "created",
+      "agents": [
+        {
+          "agent_name": "dashboard"
+        }
+      ],
+      "created_at": "2026-04-10T10:40:00Z"
+    },
+    "error_case": {
+      "invalid_payload": {
+        "swarm_id": "swarm_1",
+        "name": "X",
+        "goal": "",
+        "policy": "weighted-random",
+        "status": "new",
+        "agents": [],
+        "created_at": "10/04/2026"
+      },
+      "expected_validation_errors": [
+        "swarm_id debe ser UUID valido",
+        "name no cumple longitud minima",
+        "goal no cumple longitud minima",
+        "policy fuera de enum permitido",
+        "status fuera de enum permitido",
+        "agents debe contener al menos 1 elemento",
+        "created_at no tiene formato date-time"
+      ]
+    }
+  }
+}

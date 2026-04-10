@@ -19,6 +19,7 @@ Sistema operativo de coordinación para la IA personal de Gus: tareas, decisione
 - [Demo Visual](#demo-visual)
 - [Validadores por Canal](#validadores-por-canal)
 - [Narrativa y Bitácora](#narrativa-y-bitácora)
+- [Semana 1 Ready Pack](#semana-1-ready-pack)
 - [Arranque Consolidado](#arranque-consolidado)
 - [API HTTP](#api-http)
 - [API `/memory`](#api-memory)
@@ -308,6 +309,27 @@ Escala de asombro para validación:
 Proyección de bitácora:
 
 - Archivo generado en `projections/bitacora/bitacora_de_asombros.md`.
+
+## Semana 1 Ready Pack
+
+Para cerrar la fase de diseño tecnico antes de implementar control de enjambres (Semana 2), este repo incluye un paquete versionado en:
+
+- Migraciones: `app/sql/migrations/week1/`
+  - `up_postgres.sql`, `up_sqlite.sql`
+  - `down_postgres.sql`, `down_sqlite.sql`
+  - `seed_week1.sql`
+- Contratos JSON v1alpha1: `contracts/v1alpha1/`
+  - `UnifiedTask.json`
+  - `Swarm.json`
+  - `task_events.json`
+- Checklist DoD y guia de ejecucion: `docs/week1/README.md`
+
+Cobertura del pack:
+
+- Tablas de enjambre (`swarms`, `swarm_agents`, `swarm_cycles`, `swarm_votes`).
+- Extension `memory_entries` Opcion B (`source`, `related_channel`, `client_key`, `correlation_id`).
+- Indices de trazabilidad y continuidad multicanal.
+- Catalogo de eventos de enjambre (`task_events`) con severidad y campos requeridos.
 
 ## Arranque Consolidado
 

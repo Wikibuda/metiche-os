@@ -1,0 +1,161 @@
+{
+  "contract_name": "UnifiedTask",
+  "version": "v1alpha1",
+  "description": "Contrato canonico para normalizar solicitudes provenientes de canales (WhatsApp, Telegram, Shopify, Plane, Dashboard).",
+  "schema": {
+    "type": "object",
+    "required": [
+      "request_id",
+      "source_channel",
+      "task_type",
+      "title",
+      "priority",
+      "sla_minutes",
+      "requested_at",
+      "context"
+    ],
+    "properties": {
+      "request_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "source_channel": {
+        "type": "string",
+        "enum": ["whatsapp", "telegram", "shopify", "plane", "dashboard", "api"]
+      },
+      "task_type": {
+        "type": "string",
+        "maxLength": 50,
+        "enum": ["operational", "whatsapp", "telegram", "shopify", "plane", "deepseek", "swarm-control"]
+      },
+      "title": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 255
+      },
+      "description": {
+        "type": "string",
+        "maxLength": 4000
+      },
+      "priority": {
+        "type": "string",
+        "enum": ["blocking", "urgent", "high", "medium", "low"]
+      },
+      "sla_minutes": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 10080
+      },
+      "client_key": {
+        "type": "string",
+        "maxLength": 255
+      },
+      "correlation_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "related_channel": {
+        "type": "string",
+        "enum": ["whatsapp", "telegram", "shopify", "plane", "dashboard"]
+      },
+      "requested_at": {
+        "type": "string",
+        "format": "date-time"
+      },
+      "context": {
+        "type": "object",
+        "required": ["summary"],
+        "properties": {
+          "summary": {
+            "type": "string",
+            "minLength": 5,
+            "maxLength": 2000
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "tags": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "type": "string",
+              "maxLength": 50
+            }
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "additionalProperties": false
+  },
+  "validations": {
+    "required_fields": ["request_id", "source_channel", "task_type", "title", "priority", "sla_minutes", "requested_at", "context"],
+    "max_lengths": {
+      "title": 255,
+      "description": 4000,
+      "client_key": 255,
+      "context.summary": 2000
+    },
+    "enum_fields": {
+      "source_channel": ["whatsapp", "telegram", "shopify", "plane", "dashboard", "api"],
+      "priority": ["blocking", "urgent", "high", "medium", "low"],
+      "task_type": ["operational", "whatsapp", "telegram", "shopify", "plane", "deepseek", "swarm-control"]
+    }
+  },
+  "payload_examples": {
+    "happy_path": {
+      "request_id": "9b7f442a-59c6-4f50-95f6-aafde2650d16",
+      "source_channel": "whatsapp",
+      "task_type": "swarm-control",
+      "title": "Continuar conversacion multicanal cliente 44",
+      "description": "Cliente escribio por WhatsApp y requiere continuidad por Telegram.",
+      "priority": "high",
+      "sla_minutes": 30,
+      "client_key": "cliente-44",
+      "correlation_id": "67c5c524-52fa-4b7d-a4ee-9f1add3521dc",
+      "related_channel": "telegram",
+      "requested_at": "2026-04-10T10:30:00Z",
+      "context": {
+        "summary": "Recuperar memoria reciente y responder con continuidad.",
+        "metadata": {
+          "order_id": "A-1032",
+          "language": "es-MX"
+        },
+        "tags": ["continuidad", "multicanal", "cliente-vip"]
+      }
+    },
+    "edge_case": {
+      "request_id": "f76f4ea3-2c57-45b4-a5b3-e65ba1a45daa",
+      "source_channel": "telegram",
+      "task_type": "operational",
+      "title": "Ping operativo",
+      "priority": "low",
+      "sla_minutes": 10080,
+      "requested_at": "2026-04-10T11:00:00Z",
+      "context": {
+        "summary": "Solicitud minima sin descripcion para prueba de borde."
+      }
+    },
+    "error_case": {
+      "invalid_payload": {
+        "request_id": "no-es-uuid",
+        "source_channel": "email",
+        "task_type": "swarm-control",
+        "title": "",
+        "priority": "critical",
+        "sla_minutes": 0,
+        "requested_at": "ayer",
+        "context": {}
+      },
+      "expected_validation_errors": [
+        "request_id debe ser UUID valido",
+        "source_channel fuera de enum permitido",
+        "title no cumple longitud minima",
+        "priority fuera de enum permitido",
+        "sla_minutes fuera de rango",
+        "requested_at no tiene formato date-time",
+        "context.summary es requerido"
+      ]
+    }
+  }
+}
