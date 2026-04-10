@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
 
+from app.api.routes_channel_memory import router as channel_memory_router
 from app.api.routes_dashboard import router as dashboard_router
 from app.api.routes_health import router as health_router
 from app.api.routes_memory import router as memory_router
@@ -24,6 +25,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="metiche-os", version="0.1.0", lifespan=lifespan)
 app.include_router(health_router)
+app.include_router(channel_memory_router)
 app.include_router(tasks_router)
 app.include_router(soul_router)
 app.include_router(narrative_router)
