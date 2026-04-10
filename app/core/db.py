@@ -4,6 +4,7 @@ from typing import Generator
 from sqlmodel import Session, SQLModel, create_engine
 
 from app.core.config import settings
+from app.domain.channel_memory.models import ChannelMemory
 from app.domain.narrative.models import NarrativeEntry
 from app.domain.rules import Rule
 from app.domain.soul.models import Actor, CanonicalPhrase, SoulProfile

@@ -5,6 +5,8 @@ from uuid import uuid4
 from sqlalchemy import text
 from sqlmodel import Session, select
 
+from app.domain.narrative.models import NarrativeEntryCreate
+from app.domain.narrative.service import create_narrative_entry
 from app.domain.swarm.models import (
     ALLOWED_AGENTS,
     ALLOWED_POLICIES,
@@ -21,6 +23,7 @@ from app.domain.swarm.models import (
     SwarmSummaryRead,
     SwarmVote,
 )
+from app.services.dispatcher import DispatchResult, UnifiedTask, dispatch_unified_task
 
 
 def create_swarm(session: Session, payload: SwarmCreate) -> SwarmRead:
@@ -99,7 +102,7 @@ def run_swarm_cycle(session: Session, swarm_id: str, payload: SwarmRunCreate) ->
     current_objective = payload.objective or swarm.goal
 
     for _ in range(payload.max_cycles):
-        cycle, votes, decision, accepted_votes, rejected_votes = _execute_single_cycle(
+        cycle, votes, decision, accepted_votes, rejected_votes, dispatch_results = _execute_single_cycle(
             session=session,
             swarm=swarm,
             agents=agents,
@@ -116,6 +119,7 @@ def run_swarm_cycle(session: Session, swarm_id: str, payload: SwarmRunCreate) ->
             decision=decision,
             related_task_id=payload.related_task_id,
             client_key=payload.client_key,
+            dispatch_results=dispatch_results,
         )
         _store_swarm_memory(
             session=session,
@@ -125,6 +129,16 @@ def run_swarm_cycle(session: Session, swarm_id: str, payload: SwarmRunCreate) ->
             accepted_votes=accepted_votes,
             rejected_votes=rejected_votes,
             client_key=payload.client_key,
+            dispatch_results=dispatch_results,
+        )
+        _store_swarm_narrative(
+            session=session,
+            swarm=swarm,
+            cycle=cycle,
+            decision=decision,
+            accepted_votes=accepted_votes,
+            rejected_votes=rejected_votes,
+            dispatch_results=dispatch_results,
         )
         if decision == "accept":
             stop_reason = "accepted_consensus"
@@ -228,7 +242,7 @@ def _execute_single_cycle(
     agents: list[SwarmAgent],
     objective: str,
     payload: SwarmRunCreate,
-) -> tuple[SwarmCycle, list[SwarmVote], str, int, int]:
+) -> tuple[SwarmCycle, list[SwarmVote], str, int, int, dict[str, DispatchResult]]:
     cycle_number = _next_cycle_number(session, swarm.id)
     cycle = SwarmCycle(
         swarm_id=swarm.id,
@@ -250,10 +264,23 @@ def _execute_single_cycle(
     session.add(cycle)
     session.commit()
 
+    dispatch_results = _dispatch_cycle_actions(
+        session=session,
+        swarm=swarm,
+        agents=agents,
+        objective=objective,
+        payload=payload,
+        cycle=cycle,
+    )
+
     votes: list[SwarmVote] = []
     vote_payload = payload.model_copy(update={"objective": objective})
     for agent in agents:
-        vote_value, reason = _simulate_vote(agent.agent_name, swarm, vote_payload)
+        dispatch_result = dispatch_results.get(agent.agent_name)
+        if dispatch_result is not None:
+            vote_value, reason = _vote_from_dispatch(agent.agent_name, dispatch_result)
+        else:
+            vote_value, reason = _simulate_vote(agent.agent_name, swarm, vote_payload)
         vote_row = SwarmVote(
             cycle_id=cycle.id,
             agent_name=agent.agent_name,
@@ -273,7 +300,10 @@ def _execute_single_cycle(
     decision = _evaluate_decision(swarm.policy, accepted_votes, rejected_votes, len(votes))
 
     cycle.phase = "adjust"
-    cycle.outcome = f"Decision del ciclo: {decision}. accept={accepted_votes}, reject={rejected_votes}"
+    cycle.outcome = (
+        f"Decision del ciclo: {decision}. accept={accepted_votes}, reject={rejected_votes}. "
+        f"dispatch={_dispatch_summary(dispatch_results)}"
+    )
     session.add(cycle)
     session.commit()
 
@@ -282,7 +312,52 @@ def _execute_single_cycle(
     session.add(cycle)
     session.commit()
     session.refresh(cycle)
-    return cycle, votes, decision, accepted_votes, rejected_votes
+    return cycle, votes, decision, accepted_votes, rejected_votes, dispatch_results
+
+
+def _dispatch_cycle_actions(
+    session: Session,
+    swarm: Swarm,
+    agents: list[SwarmAgent],
+    objective: str,
+    payload: SwarmRunCreate,
+    cycle: SwarmCycle,
+) -> dict[str, DispatchResult]:
+    results: dict[str, DispatchResult] = {}
+    agent_names = {agent.agent_name for agent in agents}
+    if "whatsapp" not in agent_names:
+        return results
+    task = UnifiedTask(
+        task_type="send_message",
+        channel="whatsapp",
+        client_key=(payload.client_key or "swarm-whatsapp-demo").strip(),
+        message=objective,
+        metadata={
+            "swarm_id": swarm.id,
+            "cycle_id": cycle.id,
+            "cycle_number": cycle.cycle_number,
+            "policy": swarm.policy,
+        },
+    )
+    results["whatsapp"] = dispatch_unified_task(session, task)
+    return results
+
+
+def _vote_from_dispatch(agent_name: str, result: DispatchResult) -> tuple[str, str]:
+    if result.success:
+        return ("accept", f"{agent_name} envio mensaje correctamente y valida continuar el ciclo.")
+    return ("reject", f"{agent_name} no pudo enviar mensaje ({result.error or 'error_desconocido'}).")
+
+
+def _dispatch_summary(dispatch_results: dict[str, DispatchResult]) -> str:
+    if not dispatch_results:
+        return "none"
+    chunks: list[str] = []
+    for agent_name, result in dispatch_results.items():
+        status = "ok" if result.success else "fail"
+        retry_suffix = f"(r{result.retry_count})" if result.retry_count else ""
+        chunks.append(f"{agent_name}:{status}{retry_suffix}")
+    return ",".join(chunks)
 
 
 def _emit_swarm_task_event(
@@ -294,6 +369,7 @@ def _emit_swarm_task_event(
     decision: str,
     related_task_id: str | None,
     client_key: str | None,
+    dispatch_results: dict[str, DispatchResult],
 ) -> None:
     if not related_task_id:
         return
@@ -304,6 +380,18 @@ def _emit_swarm_task_event(
         "accepted_votes": accepted_votes,
         "rejected_votes": rejected_votes,
         "decision": decision,
+        "dispatch_results": {
+            agent_name: {
+                "success": result.success,
+                "channel": result.channel,
+                "task_type": result.task_type,
+                "retry_count": result.retry_count,
+                "final_status": result.final_status,
+                "error": result.error,
+                "details": result.details,
+            }
+            for agent_name, result in dispatch_results.items()
+        },
     }
     importance = "high" if decision == "reject" else "low"
     severity = "warning" if decision == "reject" else "info"
@@ -353,10 +441,12 @@ def _store_swarm_memory(
     accepted_votes: int,
     rejected_votes: int,
     client_key: str | None,
+    dispatch_results: dict[str, DispatchResult],
 ) -> None:
     memory_text = (
         f"Swarm '{swarm.name}' cerró ciclo {cycle.cycle_number} con decision {decision}. "
-        f"accept={accepted_votes}, reject={rejected_votes}, policy={swarm.policy}."
+        f"accept={accepted_votes}, reject={rejected_votes}, policy={swarm.policy}, "
+        f"dispatch={_dispatch_summary(dispatch_results)}."
     )
     try:
         conn = session.connection()
@@ -411,6 +501,34 @@ def _store_swarm_memory(
             session.commit()
         except Exception:
             session.rollback()
+
+
+def _store_swarm_narrative(
+    session: Session,
+    swarm: Swarm,
+    cycle: SwarmCycle,
+    decision: str,
+    accepted_votes: int,
+    rejected_votes: int,
+    dispatch_results: dict[str, DispatchResult],
+) -> None:
+    try:
+        create_narrative_entry(
+            session,
+            NarrativeEntryCreate(
+                title=f"Swarm {swarm.name} ciclo {cycle.cycle_number}: {decision}",
+                body=(
+                    f"El swarm '{swarm.name}' cerró ciclo {cycle.cycle_number} con decision {decision}. "
+                    f"Votos accept={accepted_votes}, reject={rejected_votes}. "
+                    f"Dispatch: {_dispatch_summary(dispatch_results)}."
+                ),
+                narrative_type="chronicle",
+                wonder_level=4 if decision == "accept" else 5,
+                narrator_code="metiche",
+            ),
+        )
+    except Exception:
+        session.rollback()
 
 
 def validate_swarm_status(swarm: Swarm) -> None:
