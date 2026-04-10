@@ -47,10 +47,13 @@ class WhatsAppAdapter:
         self.session = session
         self.api_client = api_client
         self.memory_api_base_url = memory_api_base_url or getattr(settings, "memory_api_base_url", "internal://memory")
+        self.allowed_numbers = self._parse_allowed_numbers(settings.whatsapp_allowed_numbers)
+        self.sandbox_mode = bool(settings.whatsapp_sandbox_mode)
 
     def handle_incoming_message(self, message: IncomingWhatsAppMessage) -> WhatsAppAdapterResult:
         client_key = self._extract_client_key(message.phone_number)
         trace_task = self._create_trace_task(client_key=client_key, message_text=message.text)
+        self._validate_safelist(client_key=client_key, trace_task_id=trace_task.id, direction="inbound")
 
         loaded_context = self._get_context_from_api(client_key=client_key)
         self._emit_task_event(
@@ -82,6 +85,7 @@ class WhatsAppAdapter:
     def send_message(self, message: OutboundWhatsAppMessage) -> dict[str, Any]:
         client_key = self._extract_client_key(message.client_key)
         trace_task = self._create_trace_task(client_key=client_key, message_text=message.text, direction="outbound")
+        self._validate_safelist(client_key=client_key, trace_task_id=trace_task.id, direction="outbound")
 
         loaded_context = self._get_context_from_api(client_key=client_key)
         self._emit_task_event(
@@ -102,7 +106,7 @@ class WhatsAppAdapter:
             summary="WhatsApp adapter guardo contexto tras send_message",
             payload={"client_key": client_key, "channel": "whatsapp", "context": updated_context, "action": "send_message"},
         )
-        delivery_payload = {"delivery": "simulated", "status": "sent"}
+        delivery_payload = self._send_via_whatsapp_api(client_key=client_key, text=message.text, trace_task_id=trace_task.id)
         self._emit_task_event(
             task_id=trace_task.id,
             event_type="whatsapp_send_message",
@@ -119,11 +123,51 @@ class WhatsAppAdapter:
             "context": updated_context,
         }
 
+    def _send_via_whatsapp_api(self, *, client_key: str, text: str, trace_task_id: str) -> dict[str, Any]:
+        if self.sandbox_mode:
+            payload = {"delivery": "simulated", "status": "sent", "sandbox": True}
+            self._emit_task_event(
+                task_id=trace_task_id,
+                event_type="whatsapp_sandbox_mode",
+                summary="WhatsApp sandbox activo: envio simulado",
+                payload={"client_key": client_key, "text": text, "sandbox": True},
+            )
+            return payload
+        if self.api_client is None:
+            raise RuntimeError("whatsapp_api_client_required_when_sandbox_disabled")
+        response = self.api_client.post(
+            "/whatsapp/send",
+            json={"phone_number": client_key, "text": text},
+        )
+        if response.status_code != 200:
+            raise RuntimeError(f"whatsapp_send_failed:{response.status_code}:{response.text}")
+        payload = response.json()
+        return payload if isinstance(payload, dict) else {"delivery": "real", "status": "sent"}
+
     def _extract_client_key(self, phone_number: str) -> str:
         cleaned = (phone_number or "").strip()
         if not cleaned:
             raise ValueError("phone_number_required")
         return cleaned
+
+    def _parse_allowed_numbers(self, raw_value: str) -> set[str]:
+        numbers = set()
+        for token in (raw_value or "").split(","):
+            normalized = token.strip()
+            if normalized:
+                numbers.add(normalized)
+        return numbers
+
+    def _validate_safelist(self, *, client_key: str, trace_task_id: str, direction: str) -> None:
+        if client_key in self.allowed_numbers:
+            return
+        self._emit_task_event(
+            task_id=trace_task_id,
+            event_type="whatsapp_security_block",
+            summary="WhatsApp security block por numero fuera de safelist",
+            payload={"client_key": client_key, "direction": direction, "allowed_numbers": sorted(self.allowed_numbers)},
+        )
+        raise PermissionError(f"phone_number_not_allowed:{client_key}")
 
     def _build_prompt(self, *, context: dict[str, Any], user_message: str) -> str:
         context_block = json.dumps(context, ensure_ascii=False, sort_keys=True) if context else "{}"
