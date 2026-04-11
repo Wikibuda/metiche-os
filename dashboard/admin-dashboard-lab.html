@@ -541,10 +541,10 @@
         }
 
         .channel-card {
-            border: 1px solid rgba(148, 163, 184, 0.24);
+            border: 1px solid var(--wr-border);
             border-radius: 14px;
             padding: 14px;
-            background: rgba(15, 23, 42, 0.54);
+            background: var(--wr-panel-soft);
         }
 
         .channel-card-header {
@@ -558,7 +558,7 @@
         .channel-title {
             font-weight: 700;
             font-size: 1rem;
-            color: #f8fafc;
+            color: var(--wr-text);
         }
 
         .channel-summary {
@@ -570,11 +570,11 @@
         }
 
         .channel-summary-item {
-            color: rgba(241, 245, 249, 0.9);
+            color: var(--wr-text);
         }
 
         .channel-events {
-            border-top: 1px solid rgba(148, 163, 184, 0.2);
+            border-top: 1px solid var(--wr-border);
             margin-top: 8px;
             padding-top: 8px;
             display: grid;
@@ -583,7 +583,7 @@
 
         .channel-event {
             font-size: 0.8rem;
-            color: rgba(226, 232, 240, 0.92);
+            color: var(--wr-muted);
         }
 
         .swarm-link {
@@ -1193,8 +1193,20 @@
             return "warn";
         }
 
-        function channelHealthClass(status) {
-            return status === "green" ? "ok" : "fail";
+        function channelHealthClass(item) {
+            const status = String(item?.status || "").toLowerCase();
+            const totalEvents = Number(item?.summary?.total_events || 0);
+            if (status === "green") return "ok";
+            if (status === "red" && totalEvents === 0) return "warn";
+            return "fail";
+        }
+
+        function channelHealthLabel(item) {
+            const status = String(item?.status || "").toLowerCase();
+            const totalEvents = Number(item?.summary?.total_events || 0);
+            if (status === "green") return "green";
+            if (status === "red" && totalEvents === 0) return "sin señal";
+            return "red";
         }
 
         function renderChannelCards(channels, eventsMap) {
@@ -1229,7 +1241,7 @@
                     <article class="channel-card">
                         <div class="channel-card-header">
                             <div class="channel-title">${escapeHtml(item.label || channel || "Canal")}</div>
-                            <span class="pill ${channelHealthClass(item.status)}">${escapeHtml(item.status || "red")}</span>
+                            <span class="pill ${channelHealthClass(item)}">${escapeHtml(channelHealthLabel(item))}</span>
                         </div>
                         <div class="channel-summary">
                             <div class="channel-summary-item">Eventos: <strong>${Number(summary.total_events || 0)}</strong></div>
@@ -1495,7 +1507,7 @@
                 localStorage.setItem("warroom_theme", normalized);
                 const toggleBtn = document.getElementById("swarm-theme-toggle");
                 if (toggleBtn) {
-                    toggleBtn.textContent = normalized === "light" ? "Tema: Claro" : "Tema: Oscuro";
+                    toggleBtn.textContent = normalized === "light" ? "Cambiar a Oscuro" : "Cambiar a Claro";
                 }
             };
 
@@ -1520,7 +1532,7 @@
                         <div class="swarm-console-title">War Room Operativo · Consola de Enjambres</div>
                         <div class="swarm-console-subtitle">Ejecución real de swarms: crear, correr, listar estado e historial completo.</div>
                     </div>
-                    <button id="swarm-theme-toggle" class="swarm-theme-toggle" type="button">Tema: Oscuro</button>
+                    <button id="swarm-theme-toggle" class="swarm-theme-toggle" type="button">Cambiar tema</button>
                 `;
                 container.prepend(header);
                 const toggle = document.getElementById("swarm-theme-toggle");
