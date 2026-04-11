@@ -39,6 +39,8 @@ class Settings(BaseSettings):
     telegram_chat_id: str = ""
     telegram_username: str = ""
     telegram_user_id: str = ""
+    telegram_allowed_ids: str = "123456789"
+    telegram_sandbox_mode: bool = True
     whatsapp_health_url: str = ""
     whatsapp_access_token: str = ""
     whatsapp_gateway_port: str = ""

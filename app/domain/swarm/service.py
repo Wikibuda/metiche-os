@@ -325,21 +325,25 @@ def _dispatch_cycle_actions(
 ) -> dict[str, DispatchResult]:
     results: dict[str, DispatchResult] = {}
     agent_names = {agent.agent_name for agent in agents}
-    if "whatsapp" not in agent_names:
+    dispatchable_channels = {"whatsapp", "telegram"}
+    channels_to_dispatch = sorted(dispatchable_channels.intersection(agent_names))
+    if not channels_to_dispatch:
         return results
-    task = UnifiedTask(
-        task_type="send_message",
-        channel="whatsapp",
-        client_key=(payload.client_key or "swarm-whatsapp-demo").strip(),
-        message=objective,
-        metadata={
-            "swarm_id": swarm.id,
-            "cycle_id": cycle.id,
-            "cycle_number": cycle.cycle_number,
-            "policy": swarm.policy,
-        },
-    )
-    results["whatsapp"] = dispatch_unified_task(session, task)
+    client_key = (payload.client_key or "swarm-channel-demo").strip()
+    for channel in channels_to_dispatch:
+        task = UnifiedTask(
+            task_type="send_message",
+            channel=channel,
+            client_key=client_key,
+            message=objective,
+            metadata={
+                "swarm_id": swarm.id,
+                "cycle_id": cycle.id,
+                "cycle_number": cycle.cycle_number,
+                "policy": swarm.policy,
+            },
+        )
+        results[channel] = dispatch_unified_task(session, task)
     return results
 
 

@@ -6,6 +6,7 @@ from typing import Any
 
 from sqlmodel import Session
 
+from app.integrations.telegram_adapter import OutboundTelegramMessage, TelegramAdapter
 from app.integrations.whatsapp_adapter import OutboundWhatsAppMessage, WhatsAppAdapter
 
 
@@ -55,6 +56,8 @@ def _classify_dispatch_exception(exc: Exception) -> str:
         "invalid number",
         "phone_number_invalid",
         "invalid_phone",
+        "invalid_telegram_chat_id",
+        "chat_id_not_allowed",
     )
     if any(hint in error_text for hint in non_retryable_hints):
         return "non_retryable"
@@ -79,7 +82,7 @@ def dispatch_unified_task(
             final_status="failed_non_retryable",
             error="unsupported_task_type",
         )
-    if normalized_channel != "whatsapp":
+    if normalized_channel not in {"whatsapp", "telegram"}:
         return DispatchResult(
             success=False,
             channel=normalized_channel,
@@ -89,15 +92,20 @@ def dispatch_unified_task(
             final_status="failed_non_retryable",
             error="unsupported_channel",
         )
-    adapter = WhatsAppAdapter(session=session, api_client=api_client)
+    if normalized_channel == "telegram":
+        adapter: Any = TelegramAdapter(session=session, api_client=api_client)
+        outbound_payload: Any = OutboundTelegramMessage(client_key=task.client_key, text=task.message)
+    else:
+        adapter = WhatsAppAdapter(session=session, api_client=api_client)
+        outbound_payload = OutboundWhatsAppMessage(client_key=task.client_key, text=task.message)
     retry_count = 0
     errors: list[dict[str, Any]] = []
     while True:
         try:
-            payload = adapter.send_message(OutboundWhatsAppMessage(client_key=task.client_key, text=task.message))
+            payload = adapter.send_message(outbound_payload)
             return DispatchResult(
                 success=bool(payload.get("success")),
-                channel="whatsapp",
+                channel=normalized_channel,
                 task_type="send_message",
                 details={"payload": payload, "metadata": task.metadata, "errors": errors},
                 retry_count=retry_count,
@@ -116,7 +124,7 @@ def dispatch_unified_task(
             if classification != "retryable":
                 return DispatchResult(
                     success=False,
-                    channel="whatsapp",
+                    channel=normalized_channel,
                     task_type="send_message",
                     details={"metadata": task.metadata, "errors": errors},
                     retry_count=retry_count,
@@ -126,7 +134,7 @@ def dispatch_unified_task(
             if retry_count >= MAX_RETRIES:
                 return DispatchResult(
                     success=False,
-                    channel="whatsapp",
+                    channel=normalized_channel,
                     task_type="send_message",
                     details={"metadata": task.metadata, "errors": errors},
                     retry_count=retry_count,
