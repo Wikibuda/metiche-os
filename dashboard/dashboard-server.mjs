@@ -218,8 +218,16 @@ async function safeReadJson(filePath) {
 }
 
 async function getDeepSeekBalance() {
-  const DEEPSEEK_TOKEN = "sk-REDACTED";
+  const DEEPSEEK_TOKEN = String(process.env.DEEPSEEK_API_KEY || "").trim();
   const API_URL = "https://api.deepseek.com/user/balance";
+
+  if (!DEEPSEEK_TOKEN) {
+    return {
+      ok: false,
+      error: "DEEPSEEK_API_KEY no configurada",
+      timestamp: new Date().toISOString()
+    };
+  }
   
   try {
     const response = await fetch(API_URL, {
