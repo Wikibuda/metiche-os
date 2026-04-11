@@ -8,6 +8,8 @@ from sqlmodel import Session
 
 from app.core.db import get_session
 from app.services.dashboard_service import (
+    get_channel_events,
+    get_channels_status,
     get_dashboard_stats,
     get_recent_narratives_block,
     get_task_detail,
@@ -129,3 +131,30 @@ def get_dashboard_recent_narratives_route(
     session: Session = Depends(get_session),
 ) -> dict:
     return {"generated_at": datetime.utcnow(), "items": get_recent_narratives_block(session, limit=limit)}
+
+
+@router.get("/channels/status")
+def get_dashboard_channels_status_route(
+    event_preview_limit: int = Query(default=5, ge=1, le=10),
+    inactivity_minutes: int = Query(default=60, ge=1, le=1440),
+    session: Session = Depends(get_session),
+) -> dict:
+    return get_channels_status(
+        session,
+        event_preview_limit=event_preview_limit,
+        inactivity_minutes=inactivity_minutes,
+    )
+
+
+@router.get("/channels/events")
+def get_dashboard_channel_events_route(
+    channel: str = Query(..., description="Canal a consultar: whatsapp|telegram"),
+    limit: int = Query(default=10, ge=1, le=100),
+    session: Session = Depends(get_session),
+) -> dict:
+    try:
+        return get_channel_events(session, channel=channel, limit=limit)
+    except ValueError as exc:
+        if str(exc) == "unsupported_channel":
+            raise HTTPException(status_code=400, detail="Canal no soportado") from exc
+        raise

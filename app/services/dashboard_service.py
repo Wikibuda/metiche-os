@@ -12,6 +12,7 @@ from app.domain.tasks.service import build_operational_overview, derive_queue_bu
 
 BOARD_STATUSES = ("queued", "running", "retrying", "failed", "done")
 VALIDATOR_CHANNELS = ("telegram", "whatsapp", "shopify", "dashboard", "deepseek")
+CHANNEL_STATUS_SUPPORTED = ("whatsapp", "telegram")
 
 
 def map_task_status(raw_status: str) -> str:
@@ -52,6 +53,27 @@ def _safe_json(raw: str | None) -> dict[str, Any]:
     except Exception:
         return {}
     return value if isinstance(value, dict) else {}
+
+
+def _normalize_supported_channel(channel: str) -> str:
+    normalized = (channel or "").strip().lower()
+    if normalized not in CHANNEL_STATUS_SUPPORTED:
+        raise ValueError("unsupported_channel")
+    return normalized
+
+
+def _coerce_datetime(value: Any) -> datetime | None:
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        candidate = value.strip()
+        if not candidate:
+            return None
+        try:
+            return datetime.fromisoformat(candidate.replace("Z", "+00:00")).replace(tzinfo=None)
+        except ValueError:
+            return None
+    return None
 
 
 def _extract_plane_issue_from_description(description: str | None) -> str | None:
@@ -118,6 +140,27 @@ def _load_recent_task_events(session: Session, minutes: int = 10) -> list[dict[s
                 """
             ),
             {"cutoff": cutoff},
+        ).fetchall()
+    except Exception:
+        return []
+    return [dict(row._mapping) for row in rows]
+
+
+def _load_channel_events(session: Session, *, channel: str, limit: int) -> list[dict[str, Any]]:
+    safe_channel = _normalize_supported_channel(channel)
+    safe_limit = max(1, min(limit, 100))
+    try:
+        rows = session.connection().execute(
+            text(
+                """
+                SELECT id, task_id, event_type, event_summary, importance_level, wonder_level, payload_json, occurred_at
+                FROM task_events
+                WHERE event_type LIKE :prefix
+                ORDER BY occurred_at DESC
+                LIMIT :limit
+                """
+            ),
+            {"prefix": f"{safe_channel}_%", "limit": safe_limit},
         ).fetchall()
     except Exception:
         return []
@@ -469,6 +512,76 @@ def get_recent_narratives_block(session: Session, limit: int = 8) -> list[dict[s
         }
         for row in rows
     ]
+
+
+def get_channel_events(session: Session, *, channel: str, limit: int = 10) -> dict[str, Any]:
+    safe_channel = _normalize_supported_channel(channel)
+    rows = _load_channel_events(session, channel=safe_channel, limit=limit)
+    items = [
+        {
+            "id": row.get("id"),
+            "task_id": row.get("task_id"),
+            "event_type": row.get("event_type"),
+            "summary": row.get("event_summary"),
+            "importance_level": row.get("importance_level"),
+            "wonder_level": row.get("wonder_level"),
+            "occurred_at": row.get("occurred_at"),
+            "payload": _safe_json(row.get("payload_json")),
+        }
+        for row in rows
+    ]
+    return {
+        "generated_at": datetime.utcnow(),
+        "channel": safe_channel,
+        "limit": max(1, min(limit, 100)),
+        "total": len(items),
+        "items": items,
+    }
+
+
+def get_channels_status(session: Session, *, event_preview_limit: int = 5, inactivity_minutes: int = 60) -> dict[str, Any]:
+    now = datetime.utcnow()
+    stale_cutoff = now - timedelta(minutes=max(1, inactivity_minutes))
+    channels: list[dict[str, Any]] = []
+
+    for channel in CHANNEL_STATUS_SUPPORTED:
+        rows = _load_channel_events(session, channel=channel, limit=max(3, min(event_preview_limit, 10)))
+        event_types = [str(row.get("event_type") or "") for row in rows]
+        last_event_at = rows[0].get("occurred_at") if rows else None
+        last_event_ts = _coerce_datetime(last_event_at)
+        healthy = bool(last_event_ts and last_event_ts >= stale_cutoff)
+        status = "green" if healthy else "red"
+        summary = {
+            "total_events": len(rows),
+            "memory_reads": sum(1 for event_type in event_types if event_type.endswith("_memory_read")),
+            "memory_writes": sum(1 for event_type in event_types if event_type.endswith("_memory_write")),
+            "send_messages": sum(1 for event_type in event_types if event_type.endswith("_send_message")),
+            "sandbox_actions": sum(1 for event_type in event_types if event_type.endswith("_sandbox_mode")),
+            "security_blocks": sum(1 for event_type in event_types if event_type.endswith("_security_block")),
+        }
+        channels.append(
+            {
+                "channel": channel,
+                "label": channel.capitalize(),
+                "status": status,
+                "healthy": healthy,
+                "last_event_at": last_event_at,
+                "summary": summary,
+                "last_events": [
+                    {
+                        "event_type": row.get("event_type"),
+                        "summary": row.get("event_summary"),
+                        "occurred_at": row.get("occurred_at"),
+                    }
+                    for row in rows
+                ],
+            }
+        )
+
+    return {
+        "generated_at": now,
+        "channels": channels,
+    }
 
 
 def run_quick_task(session: Session, *, channel: str, title: str, description: str | None, launch_swarm: bool) -> dict[str, Any]:
