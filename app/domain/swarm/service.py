@@ -1,10 +1,12 @@
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
+from typing import Any
 from uuid import uuid4
 
 from sqlalchemy import text
 from sqlmodel import Session, select
 
+from app.services.channel_memory_service import ChannelMemoryService
 from app.domain.narrative.models import NarrativeEntryCreate
 from app.domain.narrative.service import create_narrative_entry
 from app.domain.swarm.models import (
@@ -102,7 +104,7 @@ def run_swarm_cycle(session: Session, swarm_id: str, payload: SwarmRunCreate) ->
     current_objective = payload.objective or swarm.goal
 
     for _ in range(payload.max_cycles):
-        cycle, votes, decision, accepted_votes, rejected_votes, dispatch_results = _execute_single_cycle(
+        cycle, votes, decision, accepted_votes, rejected_votes, dispatch_results, dispatch_policy = _execute_single_cycle(
             session=session,
             swarm=swarm,
             agents=agents,
@@ -120,6 +122,7 @@ def run_swarm_cycle(session: Session, swarm_id: str, payload: SwarmRunCreate) ->
             related_task_id=payload.related_task_id,
             client_key=payload.client_key,
             dispatch_results=dispatch_results,
+            dispatch_policy=dispatch_policy,
         )
         _store_swarm_memory(
             session=session,
@@ -130,6 +133,7 @@ def run_swarm_cycle(session: Session, swarm_id: str, payload: SwarmRunCreate) ->
             rejected_votes=rejected_votes,
             client_key=payload.client_key,
             dispatch_results=dispatch_results,
+            dispatch_policy=dispatch_policy,
         )
         _store_swarm_narrative(
             session=session,
@@ -139,6 +143,7 @@ def run_swarm_cycle(session: Session, swarm_id: str, payload: SwarmRunCreate) ->
             accepted_votes=accepted_votes,
             rejected_votes=rejected_votes,
             dispatch_results=dispatch_results,
+            dispatch_policy=dispatch_policy,
         )
         if decision == "accept":
             stop_reason = "accepted_consensus"
@@ -236,13 +241,136 @@ def _evaluate_decision(policy: str, accepted_votes: int, rejected_votes: int, to
     return "accept" if accepted_votes > rejected_votes else "reject"
 
 
+def _coerce_datetime(value: Any) -> datetime | None:
+    if isinstance(value, datetime):
+        return value.replace(tzinfo=None)
+    if isinstance(value, str):
+        candidate = value.strip()
+        if not candidate:
+            return None
+        try:
+            return datetime.fromisoformat(candidate.replace("Z", "+00:00")).replace(tzinfo=None)
+        except ValueError:
+            return None
+    return None
+
+
+def _channel_health_map(
+    session: Session,
+    channels: list[str],
+    *,
+    inactivity_minutes: int = 60,
+) -> dict[str, dict[str, Any]]:
+    now = datetime.utcnow()
+    stale_cutoff = now - timedelta(minutes=max(1, inactivity_minutes))
+    output: dict[str, dict[str, Any]] = {}
+    for channel in channels:
+        row = session.connection().execute(
+            text(
+                """
+                SELECT occurred_at
+                FROM task_events
+                WHERE event_type LIKE :prefix
+                ORDER BY occurred_at DESC
+                LIMIT 1
+                """
+            ),
+            {"prefix": f"{channel}_%"},
+        ).first()
+        last_event_at = row._mapping.get("occurred_at") if row else None
+        last_event_ts = _coerce_datetime(last_event_at)
+        healthy = bool(last_event_ts and last_event_ts >= stale_cutoff)
+        output[channel] = {
+            "status": "green" if healthy else "red",
+            "healthy": healthy,
+            "last_event_at": last_event_ts.isoformat() if last_event_ts else None,
+        }
+    return output
+
+
+def _memory_channel_hints(session: Session, channels: list[str], client_key: str | None) -> dict[str, Any]:
+    if not client_key:
+        return {"preferred_channel": None, "blocked_channels": []}
+    service = ChannelMemoryService(session)
+    preferred_channel: str | None = None
+    blocked_channels: set[str] = set()
+    last_channel: str | None = None
+    for channel in channels:
+        context = service.get_context(client_key=client_key, channel=channel) or {}
+        preferred = str(context.get("preferred_channel") or "").strip().lower()
+        if preferred in channels and not preferred_channel:
+            preferred_channel = preferred
+        blocked = context.get("blocked_channels")
+        if isinstance(blocked, list):
+            for item in blocked:
+                candidate = str(item or "").strip().lower()
+                if candidate in channels:
+                    blocked_channels.add(candidate)
+        if not last_channel:
+            candidate_last = str(context.get("last_channel") or "").strip().lower()
+            if candidate_last in channels:
+                last_channel = candidate_last
+    return {
+        "preferred_channel": preferred_channel,
+        "blocked_channels": sorted(blocked_channels),
+        "last_channel": last_channel,
+    }
+
+
+def _select_dispatch_channels(
+    session: Session,
+    channels: list[str],
+    client_key: str | None,
+) -> dict[str, Any]:
+    health = _channel_health_map(session, channels)
+    hints = _memory_channel_hints(session, channels, client_key)
+    blocked_channels = set(hints["blocked_channels"])
+    allowed_channels = [channel for channel in channels if channel not in blocked_channels]
+    if not allowed_channels:
+        return {
+            "selected_channels": [],
+            "skipped_channels": sorted(channels),
+            "reason": "all_channels_blocked_by_memory",
+            "degraded_mode": True,
+            "health": health,
+            "hints": hints,
+        }
+    healthy_channels = [channel for channel in allowed_channels if bool(health[channel]["healthy"])]
+    selected_channels = healthy_channels if healthy_channels else list(allowed_channels)
+    preferred_channel = hints.get("preferred_channel")
+    if preferred_channel in selected_channels:
+        selected_channels.sort(key=lambda item: 0 if item == preferred_channel else 1)
+    elif not healthy_channels and preferred_channel in allowed_channels and preferred_channel not in selected_channels:
+        # Si el canal preferido esta permitido pero en rojo, se usa como fallback unico.
+        selected_channels = [preferred_channel]
+    skipped_channels = sorted([channel for channel in channels if channel not in selected_channels])
+    reason_parts: list[str] = []
+    if preferred_channel:
+        reason_parts.append(f"preferred={preferred_channel}")
+    if blocked_channels:
+        reason_parts.append(f"blocked={','.join(sorted(blocked_channels))}")
+    if healthy_channels:
+        reason_parts.append(f"healthy={','.join(sorted(healthy_channels))}")
+    else:
+        reason_parts.append("healthy=none")
+    reason_parts.append("mode=degraded" if not healthy_channels else "mode=healthy")
+    return {
+        "selected_channels": selected_channels,
+        "skipped_channels": skipped_channels,
+        "reason": ";".join(reason_parts),
+        "degraded_mode": not healthy_channels,
+        "health": health,
+        "hints": hints,
+    }
+
+
 def _execute_single_cycle(
     session: Session,
     swarm: Swarm,
     agents: list[SwarmAgent],
     objective: str,
     payload: SwarmRunCreate,
-) -> tuple[SwarmCycle, list[SwarmVote], str, int, int, dict[str, DispatchResult]]:
+) -> tuple[SwarmCycle, list[SwarmVote], str, int, int, dict[str, DispatchResult], dict[str, Any]]:
     cycle_number = _next_cycle_number(session, swarm.id)
     cycle = SwarmCycle(
         swarm_id=swarm.id,
@@ -264,7 +392,7 @@ def _execute_single_cycle(
     session.add(cycle)
     session.commit()
 
-    dispatch_results = _dispatch_cycle_actions(
+    dispatch_results, dispatch_policy = _dispatch_cycle_actions(
         session=session,
         swarm=swarm,
         agents=agents,
@@ -279,6 +407,9 @@ def _execute_single_cycle(
         dispatch_result = dispatch_results.get(agent.agent_name)
         if dispatch_result is not None:
             vote_value, reason = _vote_from_dispatch(agent.agent_name, dispatch_result)
+        elif agent.agent_name in set(dispatch_policy.get("skipped_channels", [])):
+            vote_value = "abstain"
+            reason = f"{agent.agent_name} omitido por policy de canal ({dispatch_policy.get('reason')})."
         else:
             vote_value, reason = _simulate_vote(agent.agent_name, swarm, vote_payload)
         vote_row = SwarmVote(
@@ -302,7 +433,10 @@ def _execute_single_cycle(
     cycle.phase = "adjust"
     cycle.outcome = (
         f"Decision del ciclo: {decision}. accept={accepted_votes}, reject={rejected_votes}. "
-        f"dispatch={_dispatch_summary(dispatch_results)}"
+        f"dispatch={_dispatch_summary(dispatch_results)}. "
+        f"policy={dispatch_policy.get('reason')} "
+        f"selected={','.join(dispatch_policy.get('selected_channels', [])) or 'none'} "
+        f"skipped={','.join(dispatch_policy.get('skipped_channels', [])) or 'none'}"
     )
     session.add(cycle)
     session.commit()
@@ -312,7 +446,7 @@ def _execute_single_cycle(
     session.add(cycle)
     session.commit()
     session.refresh(cycle)
-    return cycle, votes, decision, accepted_votes, rejected_votes, dispatch_results
+    return cycle, votes, decision, accepted_votes, rejected_votes, dispatch_results, dispatch_policy
 
 
 def _dispatch_cycle_actions(
@@ -322,15 +456,23 @@ def _dispatch_cycle_actions(
     objective: str,
     payload: SwarmRunCreate,
     cycle: SwarmCycle,
-) -> dict[str, DispatchResult]:
+) -> tuple[dict[str, DispatchResult], dict[str, Any]]:
     results: dict[str, DispatchResult] = {}
     agent_names = {agent.agent_name for agent in agents}
     dispatchable_channels = {"whatsapp", "telegram"}
-    channels_to_dispatch = sorted(dispatchable_channels.intersection(agent_names))
-    if not channels_to_dispatch:
-        return results
+    candidate_channels = sorted(dispatchable_channels.intersection(agent_names))
+    if not candidate_channels:
+        return results, {
+            "selected_channels": [],
+            "skipped_channels": [],
+            "reason": "no_dispatchable_channels",
+            "degraded_mode": False,
+            "health": {},
+            "hints": {},
+        }
     client_key = (payload.client_key or "swarm-channel-demo").strip()
-    for channel in channels_to_dispatch:
+    dispatch_policy = _select_dispatch_channels(session, candidate_channels, client_key)
+    for channel in dispatch_policy["selected_channels"]:
         task = UnifiedTask(
             task_type="send_message",
             channel=channel,
@@ -341,10 +483,11 @@ def _dispatch_cycle_actions(
                 "cycle_id": cycle.id,
                 "cycle_number": cycle.cycle_number,
                 "policy": swarm.policy,
+                "dispatch_policy": dispatch_policy["reason"],
             },
         )
         results[channel] = dispatch_unified_task(session, task)
-    return results
+    return results, dispatch_policy
 
 
 def _vote_from_dispatch(agent_name: str, result: DispatchResult) -> tuple[str, str]:
@@ -374,6 +517,7 @@ def _emit_swarm_task_event(
     related_task_id: str | None,
     client_key: str | None,
     dispatch_results: dict[str, DispatchResult],
+    dispatch_policy: dict[str, Any],
 ) -> None:
     if not related_task_id:
         return
@@ -396,6 +540,7 @@ def _emit_swarm_task_event(
             }
             for agent_name, result in dispatch_results.items()
         },
+        "dispatch_policy": dispatch_policy,
     }
     importance = "high" if decision == "reject" else "low"
     severity = "warning" if decision == "reject" else "info"
@@ -446,11 +591,13 @@ def _store_swarm_memory(
     rejected_votes: int,
     client_key: str | None,
     dispatch_results: dict[str, DispatchResult],
+    dispatch_policy: dict[str, Any],
 ) -> None:
     memory_text = (
         f"Swarm '{swarm.name}' cerró ciclo {cycle.cycle_number} con decision {decision}. "
         f"accept={accepted_votes}, reject={rejected_votes}, policy={swarm.policy}, "
-        f"dispatch={_dispatch_summary(dispatch_results)}."
+        f"dispatch={_dispatch_summary(dispatch_results)}, "
+        f"channels={','.join(dispatch_policy.get('selected_channels', [])) or 'none'}."
     )
     try:
         conn = session.connection()
@@ -515,6 +662,7 @@ def _store_swarm_narrative(
     accepted_votes: int,
     rejected_votes: int,
     dispatch_results: dict[str, DispatchResult],
+    dispatch_policy: dict[str, Any],
 ) -> None:
     try:
         create_narrative_entry(
@@ -524,7 +672,9 @@ def _store_swarm_narrative(
                 body=(
                     f"El swarm '{swarm.name}' cerró ciclo {cycle.cycle_number} con decision {decision}. "
                     f"Votos accept={accepted_votes}, reject={rejected_votes}. "
-                    f"Dispatch: {_dispatch_summary(dispatch_results)}."
+                    f"Dispatch: {_dispatch_summary(dispatch_results)}. "
+                    f"Canales seleccionados: {', '.join(dispatch_policy.get('selected_channels', [])) or 'none'}. "
+                    f"Canales omitidos: {', '.join(dispatch_policy.get('skipped_channels', [])) or 'none'}."
                 ),
                 narrative_type="chronicle",
                 wonder_level=4 if decision == "accept" else 5,
