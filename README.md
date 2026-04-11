@@ -420,6 +420,8 @@ Documentacion Swagger:
 - `POST /dashboard/tasks/{task_id}/action`
 - `GET /dashboard/validators`
 - `GET /dashboard/recent-narratives`
+- `GET /dashboard/channels/status`
+- `GET /dashboard/channels/events?channel=whatsapp&limit=10`
 
 ### Ejemplos curl
 

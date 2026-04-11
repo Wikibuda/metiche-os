@@ -534,6 +534,58 @@
             grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
         }
 
+        .channel-grid {
+            display: grid;
+            gap: 14px;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        }
+
+        .channel-card {
+            border: 1px solid rgba(148, 163, 184, 0.24);
+            border-radius: 14px;
+            padding: 14px;
+            background: rgba(15, 23, 42, 0.54);
+        }
+
+        .channel-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .channel-title {
+            font-weight: 700;
+            font-size: 1rem;
+            color: #f8fafc;
+        }
+
+        .channel-summary {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 6px 10px;
+            margin-bottom: 10px;
+            font-size: 0.84rem;
+        }
+
+        .channel-summary-item {
+            color: rgba(241, 245, 249, 0.9);
+        }
+
+        .channel-events {
+            border-top: 1px solid rgba(148, 163, 184, 0.2);
+            margin-top: 8px;
+            padding-top: 8px;
+            display: grid;
+            gap: 6px;
+        }
+
+        .channel-event {
+            font-size: 0.8rem;
+            color: rgba(226, 232, 240, 0.92);
+        }
+
         .swarm-link {
             background: transparent;
             border: 0;
@@ -765,6 +817,22 @@
             </div>
         </section>
 
+        <section class="panel" id="channels-status-panel">
+            <h2>Estado de Canales</h2>
+            <div class="meta" id="channels-meta">Cargando salud de WhatsApp y Telegram…</div>
+            <div class="channel-grid" id="channels-grid">
+                <article class="channel-card">
+                    <div class="channel-card-header">
+                        <div class="channel-title">Inicializando…</div>
+                        <span class="pill warn">cargando</span>
+                    </div>
+                    <div class="channel-summary">
+                        <div class="channel-summary-item">Esperando datos de canales.</div>
+                    </div>
+                </article>
+            </div>
+        </section>
+
         <section class="panel" id="legacy-detail-panel">
             <h2>Enjambres Recientes</h2>
             <div class="split-panels">
@@ -805,6 +873,7 @@
         let currentDetailView = "full";
         let refreshTimer = null;
         let swarmRefreshTimer = null;
+        let channelRefreshTimer = null;
         let selectedSwarmId = "";
         const TASK_ID_STORAGE_KEY = "metiche_lab_last_task_id";
 
@@ -1124,6 +1193,90 @@
             return "warn";
         }
 
+        function channelHealthClass(status) {
+            return status === "green" ? "ok" : "fail";
+        }
+
+        function renderChannelCards(channels, eventsMap) {
+            const grid = document.getElementById("channels-grid");
+            if (!grid) return;
+            if (!Array.isArray(channels) || !channels.length) {
+                grid.innerHTML = `
+                    <article class="channel-card">
+                        <div class="channel-card-header">
+                            <div class="channel-title">Sin datos</div>
+                            <span class="pill fail">rojo</span>
+                        </div>
+                        <div class="channel-summary">
+                            <div class="channel-summary-item">No hay actividad registrada para canales.</div>
+                        </div>
+                    </article>
+                `;
+                return;
+            }
+            grid.innerHTML = channels.map((item) => {
+                const channel = String(item.channel || "").toLowerCase();
+                const summary = item.summary || {};
+                const events = Array.isArray(eventsMap?.[channel]) ? eventsMap[channel] : [];
+                const eventsHtml = events.length
+                    ? events.map((event) => `
+                        <div class="channel-event">
+                            <code>${escapeHtml(event.event_type || "-")}</code> · ${escapeHtml(event.summary || "-")} · ${event.occurred_at ? new Date(event.occurred_at).toLocaleString("es-MX") : "-"}
+                        </div>
+                    `).join("")
+                    : '<div class="channel-event">Sin eventos recientes.</div>';
+                return `
+                    <article class="channel-card">
+                        <div class="channel-card-header">
+                            <div class="channel-title">${escapeHtml(item.label || channel || "Canal")}</div>
+                            <span class="pill ${channelHealthClass(item.status)}">${escapeHtml(item.status || "red")}</span>
+                        </div>
+                        <div class="channel-summary">
+                            <div class="channel-summary-item">Eventos: <strong>${Number(summary.total_events || 0)}</strong></div>
+                            <div class="channel-summary-item">Envíos: <strong>${Number(summary.send_messages || 0)}</strong></div>
+                            <div class="channel-summary-item">Memoria R/W: <strong>${Number(summary.memory_reads || 0)}/${Number(summary.memory_writes || 0)}</strong></div>
+                            <div class="channel-summary-item">Sandbox/Bloqueos: <strong>${Number(summary.sandbox_actions || 0)}/${Number(summary.security_blocks || 0)}</strong></div>
+                            <div class="channel-summary-item">Último evento: <strong>${item.last_event_at ? new Date(item.last_event_at).toLocaleString("es-MX") : "N/A"}</strong></div>
+                        </div>
+                        <div class="channel-events">${eventsHtml}</div>
+                    </article>
+                `;
+            }).join("");
+        }
+
+        async function loadChannelsDashboard() {
+            const metaEl = document.getElementById("channels-meta");
+            if (!metaEl) return;
+            try {
+                const statusPayload = await fetchJsonWithTimeout("/dashboard/channels/status?event_preview_limit=4", 9000);
+                const channels = Array.isArray(statusPayload.channels) ? statusPayload.channels : [];
+                const eventsByChannel = {};
+                await Promise.all(channels.map(async (item) => {
+                    const channel = String(item.channel || "").toLowerCase();
+                    if (!channel) return;
+                    try {
+                        const eventsPayload = await fetchJsonWithTimeout(
+                            `/dashboard/channels/events?channel=${encodeURIComponent(channel)}&limit=5`,
+                            9000
+                        );
+                        eventsByChannel[channel] = Array.isArray(eventsPayload.items) ? eventsPayload.items : [];
+                    } catch {
+                        eventsByChannel[channel] = Array.isArray(item.last_events) ? item.last_events : [];
+                    }
+                }));
+                metaEl.textContent = `Actualizado: ${new Date(statusPayload.generated_at || Date.now()).toLocaleString("es-MX")} · Canales: ${channels.length}`;
+                renderChannelCards(channels, eventsByChannel);
+            } catch (error) {
+                metaEl.textContent = `No se pudo cargar estado de canales: ${error.message}`;
+                renderChannelCards([], {});
+            } finally {
+                if (channelRefreshTimer) clearTimeout(channelRefreshTimer);
+                channelRefreshTimer = setTimeout(() => {
+                    loadChannelsDashboard();
+                }, 12000);
+            }
+        }
+
         function parseSwarmAgents(input) {
             const raw = String(input || "").trim();
             if (!raw) return [];
@@ -1349,7 +1502,7 @@
             const theme = localStorage.getItem("warroom_theme") || "dark";
             setTheme(theme);
             document.body.classList.add("swarm-console-mode");
-            const visiblePanels = new Set(["swarm-launch-panel", "swarm-history-panel"]);
+            const visiblePanels = new Set(["swarm-launch-panel", "swarm-history-panel", "channels-status-panel"]);
             document.querySelectorAll("section.panel").forEach((panel) => {
                 if (!(panel instanceof HTMLElement)) return;
                 if (!visiblePanels.has(panel.id)) {
@@ -1389,6 +1542,7 @@
         }
         loadDashboard();
         loadRecentSwarms();
+        loadChannelsDashboard();
 
         document.getElementById("load-task-detail").addEventListener("click", () => {
             const taskId = document.getElementById("task-id-input").value;
