@@ -485,14 +485,25 @@ def get_validator_statuses(session: Session) -> list[dict[str, Any]]:
             "metadata": details.get("metadata") or {},
         }
 
+    now = datetime.utcnow()
+    stale_threshold = now - timedelta(minutes=90)
     result: list[dict[str, Any]] = []
     for channel in VALIDATOR_CHANNELS:
         attempt = latest_by_channel.get(channel)
+        status = "amber"
+        if attempt:
+            occurred_at = _coerce_datetime(attempt.get("occurred_at"))
+            if not bool(attempt.get("passed")):
+                status = "red"
+            elif occurred_at and occurred_at < stale_threshold:
+                status = "amber"
+            else:
+                status = "green"
         result.append(
             {
                 "channel": channel,
                 "label": channel.capitalize(),
-                "status": "green" if attempt and attempt.get("passed") else "red",
+                "status": status,
                 "last_check_at": attempt.get("occurred_at") if attempt else None,
                 "last_attempt": attempt,
             }

@@ -592,13 +592,22 @@
         host.innerHTML = '<div class="small">Sin intentos de validación.</div>';
         return;
       }
+      const badgeClassForStatus = (status) => {
+        if (status === "green") return "st-done";
+        if (status === "amber") return "st-retrying";
+        return "st-failed";
+      };
+      const labelForStatus = (status, lastCheckAt) => {
+        if (status === "amber") return lastCheckAt ? "stale" : "inactivo";
+        return status;
+      };
       host.innerHTML = items.map((item) => `
         <div class="validator-item" data-validator="${item.channel}">
           <div>
             <div>${item.label}</div>
             <div class="small">${fmtDate(item.last_check_at)}</div>
           </div>
-          <span class="badge ${item.status === "green" ? "st-done" : "st-failed"}">${item.status}</span>
+          <span class="badge ${badgeClassForStatus(item.status)}">${labelForStatus(item.status, item.last_check_at)}</span>
         </div>
       `).join("");
       host.querySelectorAll(".validator-item").forEach((el) => {
