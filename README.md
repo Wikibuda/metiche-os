@@ -126,8 +126,8 @@ graph TD
 
   subgraph DASHBOARD[Dashboard]
     direction TB
-    D1["dashboard/admin-dashboard-lab.html (modo swarm)"]
-    D2["dashboard/dashboard-server.mjs"]
+    D1["admin dashboard lab html - modo swarm"]
+    D2["dashboard server mjs"]
   end
 
   B --> D1
@@ -222,7 +222,7 @@ PLANE_PG_PASSWORD=plane
 PLANE_PG_DBNAME=plane
 PLANE_SYNC_PULL_LABEL=metiche:task
 
-WHATSAPP_ALLOWED_NUMBERS=+5210000000000,+5210000000001
+WHATSAPP_ALLOWED_NUMBERS=+52TU_NUMERO_1,+52TU_NUMERO_2
 WHATSAPP_SANDBOX_MODE=true
 TELEGRAM_ALLOWED_IDS=123456789,987654321
 TELEGRAM_SANDBOX_MODE=true
