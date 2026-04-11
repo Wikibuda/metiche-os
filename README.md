@@ -126,8 +126,8 @@ graph TD
 
   subgraph DASHBOARD[Dashboard]
     direction TB
-    D1[dashboard/admin-dashboard-lab.html (modo swarm)]
-    D2[dashboard/dashboard-server.mjs]
+    D1["dashboard/admin-dashboard-lab.html (modo swarm)"]
+    D2["dashboard/dashboard-server.mjs"]
   end
 
   B --> D1
@@ -227,6 +227,13 @@ WHATSAPP_SANDBOX_MODE=true
 TELEGRAM_ALLOWED_IDS=123456789,987654321
 TELEGRAM_SANDBOX_MODE=true
 ```
+
+Variables de Semana 4 (hardening de canales):
+
+- `WHATSAPP_ALLOWED_NUMBERS`: safelist de números permitidos (CSV).
+- `WHATSAPP_SANDBOX_MODE`: `true` simula envío; `false` usa integración real.
+- `TELEGRAM_ALLOWED_IDS`: safelist de `chat_id` permitidos (CSV).
+- `TELEGRAM_SANDBOX_MODE`: `true` simula envío; `false` usa integración real.
 
 ### 5) Inicializar base de datos
 
@@ -422,6 +429,14 @@ Documentacion Swagger:
 - `GET /dashboard/recent-narratives`
 - `GET /dashboard/channels/status`
 - `GET /dashboard/channels/events?channel=whatsapp&limit=10`
+- `POST /channel-memory/{client_key}`
+- `GET /channel-memory/{client_key}?channel=whatsapp`
+- `DELETE /channel-memory/{client_key}?channel=whatsapp`
+- `POST /swarm`
+- `GET /swarm`
+- `GET /swarm/{swarm_id}`
+- `POST /swarm/{swarm_id}/run`
+- `GET /swarm/{swarm_id}/history`
 
 ### Ejemplos curl
 
@@ -499,6 +514,26 @@ URLs principales:
 - `http://127.0.0.1:5063/swarm-console.html`
 - `http://127.0.0.1:5063/operativo.html`
 - `http://127.0.0.1:8091/dashboard/operativo`
+
+### Estado de canales (War Room)
+
+La consola de enjambres (`/swarm-console.html`) incluye panel **Estado de Canales** con:
+
+- Salud por canal (`green`/`red`) para WhatsApp y Telegram.
+- Resumen de actividad (`memory_reads`, `memory_writes`, `send_messages`, etc.).
+- Últimos eventos por canal consumiendo `GET /dashboard/channels/events`.
+
+## Smokes Semana 4
+
+Ejecutar desde la raíz del repo:
+
+```bash
+PYTHONPATH=. ./.venv/bin/python scripts/whatsapp_adapter_smoke.py
+PYTHONPATH=. ./.venv/bin/python scripts/telegram_adapter_smoke.py
+PYTHONPATH=. ./.venv/bin/python scripts/channels_dashboard_smoke.py
+PYTHONPATH=. ./.venv/bin/python scripts/swarm_whatsapp_e2e_smoke.py
+PYTHONPATH=. ./.venv/bin/python scripts/swarm_multichannel_e2e_smoke.py
+```
 
 ### War Room operativo
 
