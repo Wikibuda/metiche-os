@@ -45,7 +45,7 @@ def main() -> None:
             whatsapp = WhatsAppAdapter(session=session, api_client=client)
             telegram = TelegramAdapter(session=session, api_client=client)
 
-            whatsapp.send_message(OutboundWhatsAppMessage(client_key="+5210000000001", text="Smoke dashboard WA"))
+            whatsapp.send_message(OutboundWhatsAppMessage(client_key="+5210000000000", text="Smoke dashboard WA"))
             telegram.send_message(OutboundTelegramMessage(client_key="123456789", text="Smoke dashboard TG"))
 
         html = client.get("/dashboard/swarm-console.html")

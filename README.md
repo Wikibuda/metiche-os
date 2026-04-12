@@ -232,7 +232,7 @@ TELEGRAM_SANDBOX_MODE=true
 Regla de formato WhatsApp:
 
 - Todos los celulares deben comenzar con `+521` y tener 10 dígitos después.
-- Ejemplo válido: `+5210000000000`.
+- Ejemplo válido: `+521XXXXXXXXXX`.
 
 Variables de Semana 4 (hardening de canales):
 
@@ -315,14 +315,14 @@ Configuración mínima recomendada:
 ```bash
 export OPENCLAW_GATEWAY_URL=http://127.0.0.1:18797
 export WHATSAPP_SANDBOX_MODE=false
-export WHATSAPP_ALLOWED_NUMBERS=+5210000000000,+5210000000000
+export WHATSAPP_ALLOWED_NUMBERS=+521XXXXXXXXXX,+521YYYYYYYYYY
 export OPENCLAW_GATEWAY_TOKEN=<token_gateway_openclaw>
 ```
 
 ### Formato de número obligatorio
 
 - Usar siempre formato `+521` + 10 dígitos.
-- Ejemplo válido: `+5210000000000`.
+- Ejemplo válido: `+521XXXXXXXXXX`.
 
 ### Smoke tests live
 
@@ -336,7 +336,7 @@ Smoke contra API viva (`:8091`):
 
 ```bash
 METICHE_API_BASE_URL=http://127.0.0.1:8091 \
-WHATSAPP_REAL_TARGET=+5210000000000 \
+WHATSAPP_REAL_TARGET=+521XXXXXXXXXX \
 PYTHONPATH=. ./.venv/bin/python scripts/whatsapp_real_smoke_live.py
 ```
 

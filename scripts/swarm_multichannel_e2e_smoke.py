@@ -23,7 +23,7 @@ def main() -> None:
         db_path.unlink()
 
     os.environ["DATABASE_URL"] = f"sqlite:///{db_path}"
-    os.environ["WHATSAPP_ALLOWED_NUMBERS"] = "123456789,+5210000000001"
+    os.environ["WHATSAPP_ALLOWED_NUMBERS"] = "123456789,+5210000000000"
     os.environ["WHATSAPP_SANDBOX_MODE"] = "true"
     os.environ["TELEGRAM_ALLOWED_IDS"] = "123456789,987654321"
     os.environ["TELEGRAM_SANDBOX_MODE"] = "true"

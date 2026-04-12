@@ -20,7 +20,7 @@ def main() -> None:
     from app.integrations.whatsapp_adapter import IncomingWhatsAppMessage, OutboundWhatsAppMessage, WhatsAppAdapter
     from app.main import app
 
-    client_key = "+5210000000001"
+    client_key = "+5210000000000"
     unauthorized_number = "+521234567890"
     seed_context = {"customer_name": "Ada", "last_topic": "pedido retrasado", "step": 2}
 

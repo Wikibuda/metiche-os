@@ -17,7 +17,7 @@ def main() -> None:
     from app.integrations.whatsapp_adapter import WhatsAppAdapter
     from app.main import app
 
-    client_key = "+5210000000001"
+    client_key = "+5210000000000"
     objective = "Mensaje de prueba del enjambre para confirmar entrega"
     original_send = WhatsAppAdapter.send_message
     send_counter = {"calls": 0}
