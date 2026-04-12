@@ -1,0 +1,167 @@
+{
+  "contract_name": "task_events",
+  "version": "v1alpha1",
+  "description": "Catalogo de eventos operativos para observabilidad de ciclo de enjambre.",
+  "severity_levels": ["info", "warning", "error", "critical"],
+  "event_catalog": [
+    {
+      "event_type": "swarm.cycle.start",
+      "severity": "info",
+      "required_fields": ["swarm_id", "cycle_id", "correlation_id", "occurred_at"]
+    },
+    {
+      "event_type": "swarm.plan.completed",
+      "severity": "info",
+      "required_fields": ["swarm_id", "cycle_id", "correlation_id", "occurred_at"]
+    },
+    {
+      "event_type": "swarm.dispatch.completed",
+      "severity": "info",
+      "required_fields": ["swarm_id", "cycle_id", "correlation_id", "client_key", "occurred_at"]
+    },
+    {
+      "event_type": "swarm.validate.failed",
+      "severity": "warning",
+      "required_fields": ["swarm_id", "cycle_id", "correlation_id", "client_key", "error_details", "occurred_at"]
+    },
+    {
+      "event_type": "swarm.adjust.required",
+      "severity": "warning",
+      "required_fields": ["swarm_id", "cycle_id", "correlation_id", "adjustment_plan", "occurred_at"]
+    },
+    {
+      "event_type": "swarm.cycle.completed",
+      "severity": "info",
+      "required_fields": ["swarm_id", "cycle_id", "correlation_id", "outcome", "occurred_at"]
+    },
+    {
+      "event_type": "swarm.agent.failed",
+      "severity": "error",
+      "required_fields": ["swarm_id", "cycle_id", "task_id", "correlation_id", "client_key", "error_details", "occurred_at"]
+    }
+  ],
+  "schema": {
+    "type": "object",
+    "required": ["event_id", "event_type", "severity", "event_summary", "swarm_id", "cycle_id", "correlation_id", "occurred_at"],
+    "properties": {
+      "event_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "event_type": {
+        "type": "string",
+        "maxLength": 100
+      },
+      "severity": {
+        "type": "string",
+        "enum": ["info", "warning", "error", "critical"]
+      },
+      "event_summary": {
+        "type": "string",
+        "minLength": 5,
+        "maxLength": 500
+      },
+      "task_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "swarm_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "cycle_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "client_key": {
+        "type": "string",
+        "maxLength": 255
+      },
+      "correlation_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "error_details": {
+        "type": "string",
+        "maxLength": 2000
+      },
+      "adjustment_plan": {
+        "type": "string",
+        "maxLength": 2000
+      },
+      "outcome": {
+        "type": "string",
+        "maxLength": 1000
+      },
+      "payload_json": {
+        "type": "object"
+      },
+      "occurred_at": {
+        "type": "string",
+        "format": "date-time"
+      }
+    },
+    "additionalProperties": true
+  },
+  "validations": {
+    "required_fields_base": ["event_id", "event_type", "severity", "event_summary", "swarm_id", "cycle_id", "correlation_id", "occurred_at"],
+    "max_lengths": {
+      "event_type": 100,
+      "event_summary": 500,
+      "client_key": 255,
+      "error_details": 2000,
+      "adjustment_plan": 2000
+    },
+    "enum_fields": {
+      "severity": ["info", "warning", "error", "critical"]
+    }
+  },
+  "payload_examples": {
+    "happy_path": {
+      "event_id": "fd24d4b2-d925-4d3d-b7dd-6e63fba17f2f",
+      "event_type": "swarm.cycle.completed",
+      "severity": "info",
+      "event_summary": "Ciclo completado con consenso narrativo",
+      "swarm_id": "2f8f44f0-0d77-4c8a-8dc8-b4693a8f4c2a",
+      "cycle_id": "7f197090-6a4f-4edf-a7c8-c38fc8f0575d",
+      "correlation_id": "67c5c524-52fa-4b7d-a4ee-9f1add3521dc",
+      "client_key": "cliente-44",
+      "outcome": "Todos los agentes completaron su tarea sin errores bloqueantes.",
+      "occurred_at": "2026-04-10T10:45:00Z"
+    },
+    "edge_case": {
+      "event_id": "3ef1f937-1fc2-4ca7-980a-213d795fce0f",
+      "event_type": "swarm.validate.failed",
+      "severity": "warning",
+      "event_summary": "Falla temporal de validacion en Shopify",
+      "swarm_id": "2f8f44f0-0d77-4c8a-8dc8-b4693a8f4c2a",
+      "cycle_id": "7f197090-6a4f-4edf-a7c8-c38fc8f0575d",
+      "correlation_id": "67c5c524-52fa-4b7d-a4ee-9f1add3521dc",
+      "client_key": "cliente-44",
+      "error_details": "Timeout de API; se recomienda reintento con backoff.",
+      "occurred_at": "2026-04-10T10:43:12Z"
+    },
+    "error_case": {
+      "invalid_payload": {
+        "event_id": "abc",
+        "event_type": "",
+        "severity": "fatal",
+        "event_summary": "x",
+        "swarm_id": "swarm_1",
+        "cycle_id": "cycle_1",
+        "correlation_id": "req_1",
+        "occurred_at": "hoy"
+      },
+      "expected_validation_errors": [
+        "event_id debe ser UUID valido",
+        "event_type no cumple longitud minima",
+        "severity fuera de enum permitido",
+        "event_summary no cumple longitud minima",
+        "swarm_id debe ser UUID valido",
+        "cycle_id debe ser UUID valido",
+        "correlation_id debe ser UUID valido",
+        "occurred_at no tiene formato date-time"
+      ]
+    }
+  }
+}

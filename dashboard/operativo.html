@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Metiche OS - War Room Operativo</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b1020;
+      --panel: #121a2f;
+      --panel-soft: #18233e;
+      --text: #e8edf7;
+      --muted: #9ba9c7;
+      --ok: #2dd36f;
+      --warn: #ffd166;
+      --bad: #ff5f6d;
+      --brand: #6ea8fe;
+      --border: #263251;
+    }
+    body.light {
+      color-scheme: light;
+      --bg: #f5f7fb;
+      --panel: #ffffff;
+      --panel-soft: #f3f5fb;
+      --text: #1b2540;
+      --muted: #5f6f91;
+      --ok: #14a44d;
+      --warn: #d08d00;
+      --bad: #cb2b3e;
+      --brand: #2f6fed;
+      --border: #d7deee;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .wrap { padding: 14px; }
+    .topbar {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(120px, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .kpi {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+    }
+    .kpi .label { font-size: 12px; color: var(--muted); }
+    .kpi .value { font-size: 18px; font-weight: 700; margin-top: 4px; }
+    .health-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      display: inline-block;
+      margin-right: 6px;
+    }
+    .dot-green { background: var(--ok); }
+    .dot-amber { background: var(--warn); }
+    .dot-red { background: var(--bad); }
+    .layout {
+      display: grid;
+      grid-template-columns: 280px 1fr 330px;
+      gap: 12px;
+      min-height: 68vh;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .panel h2 {
+      margin: 0 0 10px 0;
+      font-size: 15px;
+    }
+    .field { margin-bottom: 10px; }
+    .field label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+    input, select, textarea, button {
+      width: 100%;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--panel-soft);
+      color: var(--text);
+      padding: 8px;
+      font-size: 13px;
+    }
+    textarea { min-height: 70px; resize: vertical; }
+    .row { display: flex; gap: 8px; align-items: center; }
+    .row > * { flex: 1; }
+    button {
+      cursor: pointer;
+      background: var(--brand);
+      border-color: transparent;
+      color: white;
+      font-weight: 600;
+    }
+    button.secondary {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .small { font-size: 12px; color: var(--muted); }
+    .filters { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
+    .board {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(170px, 1fr));
+      gap: 8px;
+    }
+    .col { background: var(--panel-soft); border: 1px solid var(--border); border-radius: 10px; padding: 8px; min-height: 220px; }
+    .col h3 { font-size: 12px; margin: 0 0 8px 0; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .task-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px;
+      margin-bottom: 8px;
+    }
+    .task-card.active { border-color: var(--brand); }
+    .task-title { font-size: 13px; font-weight: 600; margin: 4px 0; }
+    .badge {
+      border-radius: 999px;
+      font-size: 11px;
+      padding: 2px 8px;
+      border: 1px solid transparent;
+      display: inline-block;
+    }
+    .st-queued { background: rgba(110, 168, 254, 0.14); color: #8ab8ff; border-color: rgba(110, 168, 254, 0.45); }
+    .st-running { background: rgba(125, 197, 255, 0.14); color: #7dc5ff; border-color: rgba(125, 197, 255, 0.45); }
+    .st-retrying { background: rgba(255, 209, 102, 0.14); color: #ffd166; border-color: rgba(255, 209, 102, 0.45); }
+    .st-failed { background: rgba(255, 95, 109, 0.14); color: #ff8c95; border-color: rgba(255, 95, 109, 0.45); }
+    .st-done { background: rgba(45, 211, 111, 0.14); color: #84f3b2; border-color: rgba(45, 211, 111, 0.45); }
+    .task-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+    .task-actions button { font-size: 11px; padding: 6px; }
+    .detail-box {
+      background: var(--panel-soft);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px;
+      margin-bottom: 8px;
+      max-height: 230px;
+      overflow: auto;
+    }
+    .timeline-item { border-bottom: 1px solid var(--border); padding: 6px 0; font-size: 12px; }
+    .timeline-item:last-child { border-bottom: none; }
+    .validators { margin-top: 10px; }
+    .validator-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 6px;
+      cursor: pointer;
+      background: var(--panel-soft);
+    }
+    .chronicles { margin-top: 12px; }
+    .chronicle-item {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px;
+      margin-bottom: 6px;
+      background: var(--panel-soft);
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .memory-section { margin-top: 12px; }
+    .memory-item {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px;
+      margin-bottom: 6px;
+      background: var(--panel-soft);
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .event-badge {
+      border-radius: 999px;
+      font-size: 11px;
+      padding: 2px 8px;
+      border: 1px solid transparent;
+      display: inline-block;
+    }
+    .event-badge.clickable { cursor: pointer; user-select: none; }
+    .event-badge.active-filter { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.22) inset; transform: translateY(-1px); }
+    .ev-learning { background: rgba(110, 168, 254, 0.14); color: #8ab8ff; border-color: rgba(110, 168, 254, 0.45); }
+    .ev-decision { background: rgba(255, 209, 102, 0.14); color: #ffd166; border-color: rgba(255, 209, 102, 0.45); }
+    .ev-error { background: rgba(255, 95, 109, 0.14); color: #ff8c95; border-color: rgba(255, 95, 109, 0.45); }
+    .ev-milestone { background: rgba(45, 211, 111, 0.14); color: #84f3b2; border-color: rgba(45, 211, 111, 0.45); }
+    .wonder-chip {
+      background: rgba(110, 168, 254, 0.12);
+      border: 1px solid rgba(110, 168, 254, 0.45);
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 11px;
+      color: #8ab8ff;
+      display: inline-block;
+    }
+    .memory-stats {
+      margin-top: 6px;
+      margin-bottom: 8px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--panel-soft);
+      padding: 8px;
+      font-size: 12px;
+    }
+    .alerts {
+      margin-top: 8px;
+      font-size: 12px;
+      border-radius: 8px;
+      padding: 8px;
+      border: 1px solid rgba(255, 95, 109, 0.45);
+      background: rgba(255, 95, 109, 0.08);
+      color: #ffb3bb;
+      display: none;
+    }
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(3, 8, 24, 0.72);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-card {
+      width: min(920px, 100%);
+      max-height: 80vh;
+      overflow: auto;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    pre { white-space: pre-wrap; word-break: break-word; margin: 0; font-size: 12px; }
+    @media (max-width: 1220px) {
+      .layout { grid-template-columns: 1fr; }
+      .topbar { grid-template-columns: repeat(3, minmax(120px, 1fr)); }
+      .board { grid-template-columns: repeat(2, minmax(170px, 1fr)); }
+      .filters { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="topbar">
+      <div class="kpi"><div class="label">Salud Sistema</div><div class="value" id="kpi-health">-</div></div>
+      <div class="kpi"><div class="label">Fallas 10m</div><div class="value" id="kpi-failures">0</div></div>
+      <div class="kpi"><div class="label">Latencia Ciclo</div><div class="value" id="kpi-latency">-</div></div>
+      <div class="kpi"><div class="label">Alertas Críticas</div><div class="value" id="kpi-alerts">0</div></div>
+      <div class="kpi"><div class="label">Último Tick Worker</div><div class="value" id="kpi-tick">-</div></div>
+      <div class="kpi"><div class="label">Memoria Total</div><div class="value" id="kpi-memory-total">0</div></div>
+    </section>
+
+    <div class="alerts" id="top-alerts"></div>
+
+    <section class="layout">
+      <aside class="panel">
+        <h2>Lanzar Tarea Rápida</h2>
+        <div class="field">
+          <label for="quick-channel">Plantilla / Canal</label>
+          <select id="quick-channel">
+            <option value="whatsapp">whatsapp</option>
+            <option value="shopify">shopify</option>
+            <option value="telegram">telegram</option>
+            <option value="operational" selected>operational</option>
+            <option value="enjambre">enjambre</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="quick-title">Título *</label>
+          <input id="quick-title" placeholder="Ej. validar lote WhatsApp mañana" />
+        </div>
+        <div class="field">
+          <label for="quick-description">Descripción</label>
+          <textarea id="quick-description" placeholder="Contexto opcional"></textarea>
+        </div>
+        <div class="field row">
+          <label class="small"><input type="checkbox" id="quick-swarm" style="width:auto;margin-right:6px;" />Lanzar enjambre</label>
+        </div>
+        <div class="field">
+          <div class="small" style="margin-bottom: 6px;">
+            Para crear, ejecutar y ver historial completo de enjambres, abre la consola dedicada.
+          </div>
+          <a href="/dashboard/swarm-console.html" target="_blank" rel="noopener">
+            <button type="button">Abrir Consola de Enjambres</button>
+          </a>
+        </div>
+        <div class="field">
+          <button id="quick-run-btn">Ejecutar</button>
+        </div>
+        <div class="small" id="quick-run-status">Listo.</div>
+
+        <hr style="border-color: var(--border); margin: 10px 0;">
+        <h2>Registrar Memoria</h2>
+        <form id="memory-form">
+          <div class="field">
+            <label for="mem-title">Título *</label>
+            <input id="mem-title" required placeholder="Ej. Lección de validación Plane" />
+          </div>
+          <div class="field">
+            <label for="mem-content">Contenido *</label>
+            <textarea id="mem-content" required placeholder="Qué aprendimos / decidimos / falló"></textarea>
+          </div>
+          <div class="field row">
+            <div>
+              <label for="mem-type">Tipo de evento</label>
+              <select id="mem-type">
+                <option value="learning" selected>learning</option>
+                <option value="decision">decision</option>
+                <option value="error">error</option>
+                <option value="milestone">milestone</option>
+              </select>
+            </div>
+            <div>
+              <label for="mem-wonder">Asombro (1-5)</label>
+              <input id="mem-wonder" type="range" min="1" max="5" step="1" value="3" />
+              <div class="small" id="mem-wonder-label">3</div>
+            </div>
+          </div>
+          <div class="field">
+            <button id="memory-submit-btn" type="submit">Registrar en memoria</button>
+          </div>
+          <div class="small" id="memory-submit-status">Listo.</div>
+        </form>
+
+        <div class="validators">
+          <h2>Estado de Validadores</h2>
+          <div id="validators-list"></div>
+        </div>
+      </aside>
+
+      <main class="panel">
+        <h2>Tablero de Tareas en Tiempo Real</h2>
+        <div class="filters">
+          <select id="filter-channel">
+            <option value="">Canal: todos</option>
+            <option value="telegram">telegram</option>
+            <option value="whatsapp">whatsapp</option>
+            <option value="shopify">shopify</option>
+            <option value="operational">operational</option>
+            <option value="enjambre">enjambre</option>
+          </select>
+          <select id="filter-status">
+            <option value="">Estado: todos</option>
+            <option value="queued">queued</option>
+            <option value="running">running</option>
+            <option value="retrying">retrying</option>
+            <option value="failed">failed</option>
+            <option value="done">done</option>
+          </select>
+          <select id="filter-priority">
+            <option value="">Prioridad: todas</option>
+            <option value="blocking">blocking</option>
+            <option value="urgent">urgent</option>
+            <option value="high">high</option>
+            <option value="medium">medium</option>
+            <option value="low">low</option>
+          </select>
+          <input id="filter-task-id" placeholder="Buscar por task_id" />
+        </div>
+        <div class="small" id="board-meta">Cargando...</div>
+        <div class="board">
+          <div class="col"><h3>queued</h3><div id="col-queued"></div></div>
+          <div class="col"><h3>running</h3><div id="col-running"></div></div>
+          <div class="col"><h3>retrying</h3><div id="col-retrying"></div></div>
+          <div class="col"><h3>failed</h3><div id="col-failed"></div></div>
+          <div class="col"><h3>done</h3><div id="col-done"></div></div>
+        </div>
+        <div class="chronicles">
+          <h2>Últimas Crónicas</h2>
+          <div id="chronicles-list"></div>
+        </div>
+        <div class="memory-section">
+          <h2>Memoria Reciente</h2>
+          <div id="memory-stats" class="memory-stats">Cargando estadísticas...</div>
+          <div id="memory-list"></div>
+        </div>
+      </main>
+
+      <aside class="panel">
+        <h2>Detalle de Tarea</h2>
+        <div id="detail-empty" class="small">Selecciona una tarjeta para ver timeline, payload y validación.</div>
+        <div id="detail-view" style="display:none;">
+          <div class="detail-box"><strong id="detail-title">-</strong><div class="small" id="detail-meta">-</div></div>
+          <div class="detail-box">
+            <div class="small">Timeline</div>
+            <div id="detail-timeline"></div>
+          </div>
+          <div class="detail-box">
+            <div class="small">Payload + Validación</div>
+            <pre id="detail-payload">-</pre>
+          </div>
+          <div class="detail-box">
+            <div class="small">Crónica asociada</div>
+            <div id="detail-chronicle" class="small">Sin crónica</div>
+          </div>
+          <div class="row">
+            <button id="detail-retry" class="secondary">Reintentar</button>
+            <button id="detail-cancel" class="secondary">Cancelar</button>
+          </div>
+          <div class="field" style="margin-top:8px;">
+            <label for="detail-priority">Editar prioridad</label>
+            <div class="row">
+              <select id="detail-priority">
+                <option value="blocking">blocking</option>
+                <option value="urgent">urgent</option>
+                <option value="high">high</option>
+                <option value="medium" selected>medium</option>
+                <option value="low">low</option>
+              </select>
+              <button id="detail-set-priority" class="secondary">Guardar</button>
+            </div>
+          </div>
+        </div>
+        <hr style="border-color: var(--border); margin: 10px 0;">
+        <h2>Ajustes</h2>
+        <div class="field">
+          <label>Tema</label>
+          <div class="row">
+            <button id="theme-dark" class="secondary">Oscuro</button>
+            <button id="theme-light" class="secondary">Claro</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="cfg-refresh">Intervalo refresco (ms)</label>
+          <input id="cfg-refresh" type="number" min="3000" max="15000" step="500" value="4000" />
+        </div>
+        <div class="field">
+          <label for="cfg-retrying-threshold">Umbral retrying (min)</label>
+          <input id="cfg-retrying-threshold" type="number" min="1" max="30" value="2" />
+        </div>
+        <div class="field">
+          <label for="cfg-blocking-threshold">Umbral blocking</label>
+          <input id="cfg-blocking-threshold" type="number" min="1" max="20" value="3" />
+        </div>
+        <button id="cfg-apply" class="secondary">Aplicar ajustes</button>
+      </aside>
+    </section>
+  </div>
+
+  <div class="modal" id="modal">
+    <div class="modal-card">
+      <div class="modal-head">
+        <strong id="modal-title">Detalle</strong>
+        <button id="modal-close" class="secondary" style="width:auto;">Cerrar</button>
+      </div>
+      <pre id="modal-content">-</pre>
+    </div>
+  </div>
+
+  <script>
+    const state = {
+      tasks: [],
+      selectedTaskId: null,
+      selectedTaskDetail: null,
+      refreshMs: 4000,
+      memoryRefreshMs: 45000,
+      lastMemoryRefreshAt: 0,
+      memoryEntries: [],
+      memoryStats: null,
+      memoryFilterType: "",
+      retryingThreshold: 2,
+      blockingThreshold: 3,
+      timer: null
+    };
+
+    function iconForChannel(channel) {
+      const map = { telegram: "TG", whatsapp: "WA", shopify: "SH", operational: "OP", enjambre: "EJ" };
+      return map[channel] || "OP";
+    }
+
+    function fmtDate(value) {
+      if (!value) return "-";
+      const d = new Date(value);
+      if (Number.isNaN(d.getTime())) return "-";
+      return d.toLocaleString();
+    }
+
+    function qs(id) {
+      return document.getElementById(id);
+    }
+
+    function memoryApiBase() {
+      return "";
+    }
+
+    async function fetchJson(url, options = {}) {
+      const response = await fetch(url, options);
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || `HTTP ${response.status}`);
+      }
+      return response.json();
+    }
+
+    async function fetchMemoryJson(path, options = {}) {
+      const base = memoryApiBase().replace(/\/$/, "");
+      const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+      return fetchJson(`${base}${normalizedPath}`, options);
+    }
+
+    async function postJson(url, payload) {
+      return fetchJson(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload || {})
+      });
+    }
+
+    function eventMeta(eventType) {
+      const value = String(eventType || "").toLowerCase();
+      if (value === "decision") return { cls: "ev-decision", icon: "⚖", label: "decision" };
+      if (value === "error") return { cls: "ev-error", icon: "⚠", label: "error" };
+      if (value === "milestone") return { cls: "ev-milestone", icon: "✓", label: "milestone" };
+      return { cls: "ev-learning", icon: "📘", label: value || "learning" };
+    }
+
+    function wonderText(level) {
+      const safe = Math.max(1, Math.min(5, Number(level || 1)));
+      return "⭐".repeat(safe);
+    }
+
+    function setTopAlerts(alerts) {
+      const box = qs("top-alerts");
+      if (!alerts || !alerts.length) {
+        box.style.display = "none";
+        box.textContent = "";
+        return;
+      }
+      box.style.display = "block";
+      box.textContent = alerts.map((item) => item.message).join(" | ");
+    }
+
+    function renderTaskCard(task) {
+      const activeClass = state.selectedTaskId === task.task_id ? "active" : "";
+      const planeBtn = task.plane_issue_id
+        ? `<button class="secondary" data-action="open-plane" data-task="${task.task_id}">Abrir Plane</button>`
+        : "";
+      return `
+        <div class="task-card ${activeClass}" data-task="${task.task_id}">
+          <div class="row" style="align-items:flex-start;">
+            <div class="small">${iconForChannel(task.channel)} · ${task.short_id}</div>
+            <span class="badge st-${task.status}">${task.status}</span>
+          </div>
+          <div class="task-title">${task.title || "(sin título)"}</div>
+          <div class="small">${task.channel} · ${task.priority}</div>
+          <div class="task-actions">
+            <button class="secondary" data-action="retry" data-task="${task.task_id}">Reintentar</button>
+            <button class="secondary" data-action="cancel" data-task="${task.task_id}">Cancelar</button>
+            <button class="secondary" data-action="view-log" data-task="${task.task_id}">Ver log</button>
+            ${planeBtn || '<span></span>'}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderBoard(tasksResponse) {
+      const grouped = tasksResponse.grouped || {};
+      ["queued", "running", "retrying", "failed", "done"].forEach((status) => {
+        const host = qs(`col-${status}`);
+        const items = grouped[status] || [];
+        if (!items.length) {
+          host.innerHTML = '<div class="small">Sin tareas</div>';
+          return;
+        }
+        host.innerHTML = items.map(renderTaskCard).join("");
+      });
+      qs("board-meta").textContent = `Total filtrado: ${tasksResponse.total} · Refresco cada ${state.refreshMs / 1000}s`;
+      bindTaskCardEvents();
+    }
+
+    function renderValidators(validatorsResponse) {
+      const host = qs("validators-list");
+      const items = validatorsResponse.items || [];
+      if (!items.length) {
+        host.innerHTML = '<div class="small">Sin intentos de validación.</div>';
+        return;
+      }
+      const badgeClassForStatus = (status) => {
+        if (status === "green") return "st-done";
+        if (status === "amber") return "st-retrying";
+        return "st-failed";
+      };
+      const labelForStatus = (status, lastCheckAt) => {
+        if (status === "amber") return lastCheckAt ? "stale" : "inactivo";
+        return status;
+      };
+      host.innerHTML = items.map((item) => `
+        <div class="validator-item" data-validator="${item.channel}">
+          <div>
+            <div>${item.label}</div>
+            <div class="small">${fmtDate(item.last_check_at)}</div>
+          </div>
+          <span class="badge ${badgeClassForStatus(item.status)}">${labelForStatus(item.status, item.last_check_at)}</span>
+        </div>
+      `).join("");
+      host.querySelectorAll(".validator-item").forEach((el) => {
+        el.addEventListener("click", () => {
+          const channel = el.getAttribute("data-validator");
+          const match = items.find((row) => row.channel === channel);
+          openModal(`Validador ${channel}`, JSON.stringify(match, null, 2));
+        });
+      });
+    }
+
+    function renderChronicles(narrativesResponse) {
+      const host = qs("chronicles-list");
+      const items = narrativesResponse.items || [];
+      if (!items.length) {
+        host.innerHTML = '<div class="small">Sin crónicas recientes.</div>';
+        return;
+      }
+      host.innerHTML = items.map((item) => `
+        <div class="chronicle-item" data-narrative="${item.id}">
+          <div><strong>${item.title}</strong></div>
+          <div class="small">Asombro: ${item.wonder_level} · ${fmtDate(item.created_at)}</div>
+        </div>
+      `).join("");
+      host.querySelectorAll(".chronicle-item").forEach((el) => {
+        el.addEventListener("click", () => {
+          const id = el.getAttribute("data-narrative");
+          const match = items.find((row) => row.id === id);
+          openModal(match?.title || "Crónica", (match?.body || "Sin contenido"));
+        });
+      });
+    }
+
+    function applyTopStats(stats, latencyMs) {
+      const health = String(stats.system_health || "amber");
+      const dotClass = health === "green" ? "dot-green" : (health === "red" ? "dot-red" : "dot-amber");
+      qs("kpi-health").innerHTML = `<span class="health-dot ${dotClass}"></span>${health}`;
+      qs("kpi-failures").textContent = String(stats.failures_last_10m || 0);
+      qs("kpi-latency").textContent = `${latencyMs}ms`;
+      qs("kpi-alerts").textContent = String(stats.active_critical_alerts || 0);
+      qs("kpi-tick").textContent = fmtDate(stats.last_worker_tick);
+      setTopAlerts(stats.alerts || []);
+    }
+
+    function applyMemoryStats(stats) {
+      const safeStats = stats || { total_entries: 0, by_event_type: {} };
+      const byType = safeStats.by_event_type || {};
+      const chips = ["learning", "decision", "error", "milestone"]
+        .map((type) => {
+          const meta = eventMeta(type);
+          const count = byType[type] || 0;
+          const activeClass = state.memoryFilterType === type ? "active-filter" : "";
+          return `<span class="event-badge clickable ${meta.cls} ${activeClass}" data-memory-filter="${type}" style="margin-right:6px;">${meta.icon} ${type}: ${count}</span>`;
+        })
+        .join("");
+      const allActiveClass = !state.memoryFilterType ? "active-filter" : "";
+      qs("kpi-memory-total").textContent = String(safeStats.total_entries || 0);
+      qs("memory-stats").innerHTML = `
+        <div><strong>Total:</strong> ${safeStats.total_entries || 0}</div>
+        <div style="margin-top:6px;">
+          <span class="event-badge clickable ${allActiveClass}" data-memory-filter="" style="margin-right:6px;">Todos</span>
+          ${chips}
+        </div>
+      `;
+      qs("memory-stats").querySelectorAll("[data-memory-filter]").forEach((el) => {
+        el.addEventListener("click", () => {
+          state.memoryFilterType = el.getAttribute("data-memory-filter") || "";
+          applyMemoryStats(state.memoryStats);
+          renderMemory(state.memoryEntries);
+        });
+      });
+    }
+
+    function renderMemory(entries) {
+      const host = qs("memory-list");
+      const rawItems = Array.isArray(entries) ? entries : [];
+      const items = state.memoryFilterType
+        ? rawItems.filter((item) => String(item.event_type || "").toLowerCase() === state.memoryFilterType)
+        : rawItems;
+      if (!items.length) {
+        const label = state.memoryFilterType ? ` del tipo ${state.memoryFilterType}` : "";
+        host.innerHTML = `<div class="small">Sin entradas de memoria recientes${label}.</div>`;
+        return;
+      }
+      host.innerHTML = items.map((item) => {
+        const meta = eventMeta(item.event_type);
+        return `
+          <div class="memory-item" data-memory-id="${item.id}">
+            <div class="row" style="align-items:flex-start;">
+              <div><strong>${item.title || "(sin título)"}</strong></div>
+              <span class="event-badge ${meta.cls}">${meta.icon} ${meta.label}</span>
+            </div>
+            <div class="row" style="margin-top:6px;">
+              <span class="wonder-chip">${wonderText(item.wonder_level)} (${item.wonder_level || 1})</span>
+              <span class="small">${fmtDate(item.created_at)}</span>
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      host.querySelectorAll(".memory-item").forEach((el) => {
+        el.addEventListener("click", () => {
+          const id = el.getAttribute("data-memory-id");
+          const match = items.find((row) => row.id === id);
+          openModal(match?.title || "Memoria", match?.content || "Sin contenido");
+        });
+      });
+    }
+
+    async function refreshMemory(force = false) {
+      const now = Date.now();
+      if (!force && now - state.lastMemoryRefreshAt < state.memoryRefreshMs) return;
+      try {
+        const [entries, stats] = await Promise.all([
+          fetchMemoryJson("/memory/?limit=5"),
+          fetchMemoryJson("/memory/stats")
+        ]);
+        const sortedEntries = [...(entries || [])].sort((a, b) => {
+          const timeA = new Date(a.created_at || 0).getTime();
+          const timeB = new Date(b.created_at || 0).getTime();
+          return timeB - timeA;
+        });
+        state.memoryEntries = sortedEntries;
+        state.memoryStats = stats;
+        state.lastMemoryRefreshAt = now;
+        renderMemory(sortedEntries);
+        applyMemoryStats(stats);
+      } catch (error) {
+        console.error("Error cargando memoria:", error);
+        qs("memory-list").innerHTML = '<div class="small">No se pudo cargar memoria.</div>';
+        qs("memory-stats").textContent = "Error consultando estadísticas de memoria.";
+      }
+    }
+
+    async function submitMemory(event) {
+      event.preventDefault();
+      const title = qs("mem-title").value.trim();
+      const content = qs("mem-content").value.trim();
+      if (!title || !content) {
+        qs("memory-submit-status").textContent = "Título y contenido son obligatorios.";
+        return;
+      }
+      const payload = {
+        title,
+        content,
+        event_type: qs("mem-type").value,
+        wonder_level: Number(qs("mem-wonder").value || 3)
+      };
+      qs("memory-submit-status").textContent = "Registrando...";
+      try {
+        await fetchMemoryJson("/memory/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        qs("memory-submit-status").textContent = "Entrada registrada.";
+        qs("mem-title").value = "";
+        qs("mem-content").value = "";
+        qs("mem-type").value = "learning";
+        qs("mem-wonder").value = "3";
+        qs("mem-wonder-label").textContent = "3";
+        await refreshMemory(true);
+      } catch (error) {
+        console.error("Error registrando memoria:", error);
+        qs("memory-submit-status").textContent = "Error al registrar memoria.";
+      }
+    }
+
+    function bindTaskCardEvents() {
+      document.querySelectorAll(".task-card").forEach((card) => {
+        card.addEventListener("click", async (event) => {
+          const taskId = card.getAttribute("data-task");
+          const action = event.target?.getAttribute?.("data-action");
+          if (action === "retry" || action === "cancel") {
+            event.stopPropagation();
+            await runTaskAction(taskId, action);
+            return;
+          }
+          if (action === "view-log") {
+            event.stopPropagation();
+            await openTaskLog(taskId);
+            return;
+          }
+          if (action === "open-plane") {
+            event.stopPropagation();
+            const task = state.tasks.find((item) => item.task_id === taskId);
+            if (task?.plane_issue_url) {
+              window.open(task.plane_issue_url, "_blank");
+            } else if (task?.plane_issue_id) {
+              openModal("Plane", `Issue: ${task.plane_issue_id}`);
+            }
+            return;
+          }
+          await selectTask(taskId);
+        });
+      });
+    }
+
+    async function selectTask(taskId) {
+      state.selectedTaskId = taskId;
+      const detail = await fetchJson(`/dashboard/tasks/${encodeURIComponent(taskId)}`);
+      state.selectedTaskDetail = detail;
+      renderDetail(detail);
+      renderBoard({ grouped: groupTasksByStatus(state.tasks), total: state.tasks.length });
+    }
+
+    function groupTasksByStatus(tasks) {
+      const grouped = { queued: [], running: [], retrying: [], failed: [], done: [] };
+      tasks.forEach((item) => {
+        if (!grouped[item.status]) return;
+        grouped[item.status].push(item);
+      });
+      return grouped;
+    }
+
+    function renderDetail(detail) {
+      qs("detail-empty").style.display = "none";
+      qs("detail-view").style.display = "block";
+      const task = detail.task || {};
+      qs("detail-title").textContent = `${task.short_id || ""} · ${task.title || "-"}`;
+      qs("detail-meta").textContent = `${task.channel || "-"} · ${task.status_raw || "-"} · ${fmtDate(task.updated_at)}`;
+      qs("detail-payload").textContent = JSON.stringify({
+        payload: detail.payload,
+        validation: detail.validation,
+        queue_entries: detail.queue_entries
+      }, null, 2);
+      const timeline = detail.timeline || [];
+      qs("detail-timeline").innerHTML = timeline.length
+        ? timeline.slice(-25).map((item) => `
+          <div class="timeline-item">
+            <div><strong>${item.event_type}</strong> · ${fmtDate(item.occurred_at)}</div>
+            <div>${item.summary || ""}</div>
+          </div>
+        `).join("")
+        : '<div class="small">Sin eventos.</div>';
+      const chronicle = detail.chronicle;
+      qs("detail-chronicle").innerHTML = chronicle
+        ? `<strong>${chronicle.title}</strong><div>${fmtDate(chronicle.created_at)}</div>`
+        : "Sin crónica";
+      if (chronicle) {
+        qs("detail-chronicle").onclick = () => openModal(chronicle.title, chronicle.body || "");
+      } else {
+        qs("detail-chronicle").onclick = null;
+      }
+    }
+
+    async function openTaskLog(taskId) {
+      const detail = await fetchJson(`/dashboard/tasks/${encodeURIComponent(taskId)}`);
+      openModal(`Logs ${taskId}`, JSON.stringify(detail.timeline || [], null, 2));
+    }
+
+    async function runTaskAction(taskId, action, priority = null) {
+      try {
+        await postJson(`/dashboard/tasks/${encodeURIComponent(taskId)}/action`, { action, priority });
+        await refreshAll();
+      } catch (error) {
+        console.error("Error acción tarea:", error);
+        openModal("Error", String(error.message || error));
+      }
+    }
+
+    async function runQuickTask() {
+      const title = qs("quick-title").value.trim();
+      if (!title) {
+        qs("quick-run-status").textContent = "Título obligatorio.";
+        return;
+      }
+      const payload = {
+        channel: qs("quick-channel").value,
+        title,
+        description: qs("quick-description").value || null,
+        launch_swarm: qs("quick-swarm").checked
+      };
+      qs("quick-run-status").textContent = "Ejecutando...";
+      try {
+        await postJson("/dashboard/tasks/run", payload);
+        qs("quick-run-status").textContent = "Tarea lanzada.";
+        qs("quick-title").value = "";
+        qs("quick-description").value = "";
+        await refreshAll();
+      } catch (error) {
+        console.error("Error lanzar tarea:", error);
+        qs("quick-run-status").textContent = "Error al lanzar tarea.";
+      }
+    }
+
+    function openModal(title, content) {
+      qs("modal-title").textContent = title || "Detalle";
+      qs("modal-content").textContent = String(content || "");
+      qs("modal").style.display = "flex";
+    }
+
+    function closeModal() {
+      qs("modal").style.display = "none";
+    }
+
+    function applyTheme(theme) {
+      document.body.classList.toggle("light", theme === "light");
+      localStorage.setItem("warroom_theme", theme);
+    }
+
+    function currentFilters() {
+      const params = new URLSearchParams();
+      const channel = qs("filter-channel").value;
+      const status = qs("filter-status").value;
+      const priority = qs("filter-priority").value;
+      const q = qs("filter-task-id").value.trim();
+      if (channel) params.set("channel", channel);
+      if (status) params.set("status", status);
+      if (priority) params.set("priority", priority);
+      if (q) params.set("q", q);
+      params.set("limit", "200");
+      return params.toString();
+    }
+
+    async function refreshAll() {
+      const cycleStart = performance.now();
+      const query = currentFilters();
+      const statsUrl = `/dashboard/stats?retrying_threshold_minutes=${state.retryingThreshold}&blocking_threshold=${state.blockingThreshold}`;
+      const tasksUrl = `/dashboard/tasks?${query}`;
+      try {
+        const [stats, tasksResp, validatorsResp, narrativesResp] = await Promise.all([
+          fetchJson(statsUrl),
+          fetchJson(tasksUrl),
+          fetchJson("/dashboard/validators"),
+          fetchJson("/dashboard/recent-narratives?limit=8")
+        ]);
+        const latencyMs = Math.round(performance.now() - cycleStart);
+        applyTopStats(stats, latencyMs);
+        state.tasks = tasksResp.tasks || [];
+        renderBoard(tasksResp);
+        renderValidators(validatorsResp);
+        renderChronicles(narrativesResp);
+        await refreshMemory(false);
+        if (state.selectedTaskId) {
+          const stillExists = state.tasks.find((item) => item.task_id === state.selectedTaskId);
+          if (stillExists) {
+            const detail = await fetchJson(`/dashboard/tasks/${encodeURIComponent(state.selectedTaskId)}`);
+            state.selectedTaskDetail = detail;
+            renderDetail(detail);
+          }
+        }
+      } catch (error) {
+        console.error("Error refrescando dashboard:", error);
+      }
+    }
+
+    function restartPolling() {
+      if (state.timer) clearInterval(state.timer);
+      state.timer = setInterval(refreshAll, state.refreshMs);
+    }
+
+    function wireEvents() {
+      qs("quick-run-btn").addEventListener("click", runQuickTask);
+      qs("memory-form").addEventListener("submit", submitMemory);
+      qs("mem-wonder").addEventListener("input", () => {
+        qs("mem-wonder-label").textContent = String(qs("mem-wonder").value);
+      });
+      qs("modal-close").addEventListener("click", closeModal);
+      qs("modal").addEventListener("click", (event) => {
+        if (event.target.id === "modal") closeModal();
+      });
+      ["filter-channel", "filter-status", "filter-priority", "filter-task-id"].forEach((id) => {
+        qs(id).addEventListener("input", refreshAll);
+      });
+      qs("detail-retry").addEventListener("click", async () => {
+        if (!state.selectedTaskId) return;
+        await runTaskAction(state.selectedTaskId, "retry");
+      });
+      qs("detail-cancel").addEventListener("click", async () => {
+        if (!state.selectedTaskId) return;
+        await runTaskAction(state.selectedTaskId, "cancel");
+      });
+      qs("detail-set-priority").addEventListener("click", async () => {
+        if (!state.selectedTaskId) return;
+        await runTaskAction(state.selectedTaskId, "set_priority", qs("detail-priority").value);
+      });
+      qs("theme-dark").addEventListener("click", () => applyTheme("dark"));
+      qs("theme-light").addEventListener("click", () => applyTheme("light"));
+      qs("cfg-apply").addEventListener("click", () => {
+        const refresh = Number(qs("cfg-refresh").value || 4000);
+        const retrying = Number(qs("cfg-retrying-threshold").value || 2);
+        const blocking = Number(qs("cfg-blocking-threshold").value || 3);
+        state.refreshMs = Math.max(3000, Math.min(15000, refresh));
+        state.retryingThreshold = Math.max(1, Math.min(30, retrying));
+        state.blockingThreshold = Math.max(1, Math.min(20, blocking));
+        restartPolling();
+        refreshAll();
+      });
+    }
+
+    async function init() {
+      const savedTheme = localStorage.getItem("warroom_theme") || "dark";
+      applyTheme(savedTheme);
+      wireEvents();
+      await refreshAll();
+      await refreshMemory(true);
+      restartPolling();
+    }
+
+    window.addEventListener("error", (event) => {
+      console.error("Frontend error crítico:", event.error || event.message);
+    });
+
+    init();
+  </script>
+</body>
+</html>

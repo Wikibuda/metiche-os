@@ -1,0 +1,32 @@
+# Python cache and bytecode
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+.venv/
+venv/
+
+# Local environment files
+.env
+.env.*
+
+# Local runtime artifacts
+*.pid
+*.log
+
+# Local databases
+*.db
+# Sensitive local state and credentials (never commit)
+credentials/
+browser/
+backups/
+delivery-queue/
+devices/
+identity/
+sessions/
+*.session
+*.session.json
+*.jsonl
+*.pem
+*.key
+openclaw.json.backup.context

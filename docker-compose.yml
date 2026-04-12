@@ -1,0 +1,46 @@
+version: "3.9"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+    container_name: metiche-os-app
+    working_dir: /app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8091 --reload
+    ports:
+      - "8091:8091"
+    environment:
+      METICHE_ENV: development
+      DATABASE_URL: sqlite:////app/data/db/metiche_os.db
+      OPENCLAW_READONLY_ROOT: /mnt/openclaw-ro
+      PROJECTIONS_ROOT: /app/projections
+      OPENCLAW_GATEWAY_URL: http://host.docker.internal:18797
+      WHATSAPP_SANDBOX_MODE: "false"
+      WHATSAPP_ALLOWED_NUMBERS: +5210000000000,+5210000000001
+    volumes:
+      - ./:/app
+      - /Users/gusluna/.openclaw:/mnt/openclaw-ro:ro
+      - ./data:/app/data
+      - ./projections:/app/projections
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+    container_name: metiche-os-worker
+    working_dir: /app
+    command: python -m app.cli.main run-worker
+    environment:
+      METICHE_ENV: development
+      DATABASE_URL: sqlite:////app/data/db/metiche_os.db
+      OPENCLAW_READONLY_ROOT: /mnt/openclaw-ro
+      PROJECTIONS_ROOT: /app/projections
+      OPENCLAW_GATEWAY_URL: http://host.docker.internal:18797
+      WHATSAPP_SANDBOX_MODE: "false"
+      WHATSAPP_ALLOWED_NUMBERS: +5210000000000,+5210000000001
+    volumes:
+      - ./:/app
+      - /Users/gusluna/.openclaw:/mnt/openclaw-ro:ro
+      - ./data:/app/data
+      - ./projections:/app/projections

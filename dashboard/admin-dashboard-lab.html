@@ -1,0 +1,1656 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Laboratorio Metiche OS</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 45%, #312e81 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+            padding: 24px;
+        }
+
+        :root {
+            --wr-bg: #0b1020;
+            --wr-panel: #121a2f;
+            --wr-panel-soft: #18233e;
+            --wr-text: #e8edf7;
+            --wr-muted: #9ba9c7;
+            --wr-ok: #2dd36f;
+            --wr-warn: #ffd166;
+            --wr-bad: #ff5f6d;
+            --wr-brand: #6ea8fe;
+            --wr-border: #263251;
+        }
+
+        body.light {
+            --wr-bg: #f5f7fb;
+            --wr-panel: #ffffff;
+            --wr-panel-soft: #f3f5fb;
+            --wr-text: #1b2540;
+            --wr-muted: #5f6f91;
+            --wr-ok: #14a44d;
+            --wr-warn: #d08d00;
+            --wr-bad: #cb2b3e;
+            --wr-brand: #2f6fed;
+            --wr-border: #d7deee;
+        }
+
+        body.swarm-console-mode {
+            background: var(--wr-bg);
+            color: var(--wr-text);
+            padding: 14px;
+        }
+
+        .container {
+            margin: 0 auto;
+            max-width: 1200px;
+        }
+
+        body.swarm-console-mode .container {
+            max-width: 1360px;
+        }
+
+        body.swarm-console-mode .hero,
+        body.swarm-console-mode .grid,
+        body.swarm-console-mode .footer {
+            display: none;
+        }
+
+        body.swarm-console-mode .panel {
+            background: var(--wr-panel);
+            border: 1px solid var(--wr-border);
+            border-radius: 10px;
+            box-shadow: none;
+            margin-bottom: 12px;
+            padding: 12px;
+        }
+
+        body.swarm-console-mode .panel h2 {
+            font-size: 15px;
+            margin-bottom: 10px;
+        }
+
+        body.swarm-console-mode .input {
+            background: var(--wr-panel-soft);
+            border: 1px solid var(--wr-border);
+            border-radius: 8px;
+            color: var(--wr-text);
+            min-width: 220px;
+            padding: 8px;
+        }
+
+        body.swarm-console-mode .meta,
+        body.swarm-console-mode .kv-key,
+        body.swarm-console-mode .action-note {
+            color: var(--wr-muted);
+        }
+
+        body.swarm-console-mode th {
+            color: var(--wr-brand);
+        }
+
+        body.swarm-console-mode td,
+        body.swarm-console-mode .panel h2,
+        body.swarm-console-mode .kv-value {
+            color: var(--wr-text);
+        }
+
+        body.swarm-console-mode .btn {
+            background: var(--wr-brand);
+            color: #ffffff;
+        }
+
+        body.swarm-console-mode .btn.secondary {
+            background: transparent;
+            border: 1px solid var(--wr-border);
+            color: var(--wr-text);
+        }
+
+        body.swarm-console-mode .kv-item {
+            background: var(--wr-panel-soft);
+            border-radius: 10px;
+            padding: 10px;
+        }
+
+        body.swarm-console-mode .detail-card {
+            background: var(--wr-panel-soft);
+            border: 1px solid var(--wr-border);
+        }
+
+        body.swarm-console-mode .detail-card h3 {
+            color: var(--wr-brand);
+        }
+
+        body.swarm-console-mode .detail-item {
+            background: var(--wr-panel);
+            border: 1px solid var(--wr-border);
+        }
+
+        body.swarm-console-mode .detail-key {
+            color: var(--wr-muted);
+        }
+
+        body.swarm-console-mode .detail-value {
+            color: var(--wr-text);
+        }
+
+        body.swarm-console-mode .detail-json,
+        body.swarm-console-mode .code-block {
+            background: var(--wr-panel-soft);
+            border: 1px solid var(--wr-border);
+            color: var(--wr-text);
+        }
+
+        .swarm-console-header {
+            background: var(--wr-panel);
+            border: 1px solid var(--wr-border);
+            border-radius: 10px;
+            display: flex;
+            gap: 10px;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding: 10px 12px;
+        }
+
+        .swarm-console-headcopy {
+            min-width: 0;
+        }
+
+        .swarm-console-title {
+            color: var(--wr-text);
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .swarm-console-subtitle {
+            color: var(--wr-muted);
+            font-size: 12px;
+        }
+
+        .swarm-theme-toggle {
+            background: transparent;
+            border: 1px solid var(--wr-border);
+            border-radius: 8px;
+            color: var(--wr-text);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 6px 10px;
+            white-space: nowrap;
+            width: auto;
+        }
+
+        .hero {
+            background: rgba(15, 23, 42, 0.82);
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            border-radius: 24px;
+            box-shadow: 0 24px 80px rgba(15, 23, 42, 0.45);
+            margin-bottom: 24px;
+            padding: 32px;
+        }
+
+        .eyebrow {
+            color: #93c5fd;
+            font-size: 0.9rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+        }
+
+        h1 {
+            color: #f8fafc;
+            font-size: clamp(2rem, 5vw, 3.6rem);
+            line-height: 1.05;
+            margin-bottom: 12px;
+        }
+
+        .subtitle {
+            color: #cbd5e1;
+            font-size: 1.1rem;
+            line-height: 1.5;
+            max-width: 820px;
+        }
+
+        .badge-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        .badge {
+            background: rgba(59, 130, 246, 0.12);
+            border: 1px solid rgba(96, 165, 250, 0.28);
+            border-radius: 999px;
+            color: #dbeafe;
+            font-size: 0.95rem;
+            padding: 10px 16px;
+        }
+
+        .grid {
+            display: grid;
+            gap: 18px;
+            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+            margin-bottom: 24px;
+        }
+
+        .card {
+            background: rgba(15, 23, 42, 0.78);
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 20px;
+            box-shadow: 0 18px 50px rgba(15, 23, 42, 0.28);
+            padding: 22px;
+        }
+
+        .label {
+            color: #94a3b8;
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .value {
+            color: #f8fafc;
+            font-size: 2rem;
+            font-weight: 800;
+            line-height: 1.1;
+        }
+
+        .subvalue {
+            color: #cbd5e1;
+            font-size: 0.95rem;
+            margin-top: 8px;
+        }
+
+        .panel {
+            background: rgba(15, 23, 42, 0.78);
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 20px;
+            box-shadow: 0 18px 50px rgba(15, 23, 42, 0.28);
+            margin-bottom: 24px;
+            padding: 24px;
+        }
+
+        .panel h2 {
+            color: #f8fafc;
+            font-size: 1.25rem;
+            margin-bottom: 16px;
+        }
+
+        .controls {
+            align-items: center;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .input {
+            background: rgba(30, 41, 59, 0.72);
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            border-radius: 10px;
+            color: #e2e8f0;
+            min-width: 280px;
+            padding: 10px 12px;
+        }
+
+        .input.textarea {
+            min-height: 92px;
+            resize: vertical;
+            width: 100%;
+        }
+
+        .btn {
+            background: #1d4ed8;
+            border: 0;
+            border-radius: 10px;
+            color: #eff6ff;
+            cursor: pointer;
+            font-weight: 700;
+            padding: 10px 14px;
+        }
+
+        .btn.secondary {
+            background: rgba(59, 130, 246, 0.2);
+            border: 1px solid rgba(96, 165, 250, 0.35);
+            color: #dbeafe;
+        }
+
+        .btn.secondary.active {
+            background: rgba(59, 130, 246, 0.38);
+            border-color: rgba(147, 197, 253, 0.7);
+            color: #eff6ff;
+        }
+
+        .meta {
+            color: #94a3b8;
+            font-size: 0.95rem;
+            margin-bottom: 18px;
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+
+        th, td {
+            border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+            padding: 12px 10px;
+            text-align: left;
+        }
+
+        th {
+            color: #93c5fd;
+            font-size: 0.82rem;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        td {
+            color: #e2e8f0;
+            font-size: 0.95rem;
+        }
+
+        .task-link {
+            background: transparent;
+            border: 0;
+            color: #bfdbfe;
+            cursor: pointer;
+            font: inherit;
+            padding: 0;
+            text-align: left;
+        }
+
+        .pill {
+            border-radius: 999px;
+            display: inline-block;
+            font-size: 0.82rem;
+            font-weight: 700;
+            padding: 6px 10px;
+        }
+
+        .pill.ok {
+            background: rgba(34, 197, 94, 0.18);
+            color: #bbf7d0;
+        }
+
+        .pill.warn {
+            background: rgba(245, 158, 11, 0.18);
+            color: #fde68a;
+        }
+
+        .pill.fail {
+            background: rgba(239, 68, 68, 0.18);
+            color: #fecaca;
+        }
+
+        .kv {
+            display: grid;
+            gap: 12px;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        }
+
+        .kv-item {
+            background: rgba(30, 41, 59, 0.72);
+            border-radius: 16px;
+            padding: 16px;
+        }
+
+        .kv-key {
+            color: #94a3b8;
+            font-size: 0.85rem;
+            margin-bottom: 6px;
+        }
+
+        .kv-value {
+            color: #f8fafc;
+            font-size: 1rem;
+            font-weight: 700;
+            word-break: break-word;
+        }
+
+        .footer {
+            color: #94a3b8;
+            font-size: 0.9rem;
+            text-align: center;
+        }
+
+        .detail-json {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            border-radius: 12px;
+            color: #cbd5e1;
+            font-size: 0.85rem;
+            margin-top: 14px;
+            max-height: 260px;
+            overflow: auto;
+            padding: 12px;
+            white-space: pre-wrap;
+        }
+
+        .detail-render {
+            display: grid;
+            gap: 10px;
+            margin-top: 14px;
+        }
+
+        .detail-card {
+            background: rgba(15, 23, 42, 0.72);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 12px;
+            padding: 12px;
+        }
+
+        .detail-card h3 {
+            color: #dbeafe;
+            font-size: 0.95rem;
+            margin-bottom: 10px;
+        }
+
+        .detail-grid {
+            display: grid;
+            gap: 8px;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        }
+
+        .detail-item {
+            background: rgba(30, 41, 59, 0.72);
+            border-radius: 10px;
+            padding: 10px;
+        }
+
+        .detail-key {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+        }
+
+        .detail-value {
+            color: #f8fafc;
+            font-size: 0.92rem;
+            line-height: 1.35;
+            word-break: break-word;
+        }
+
+        .debug-wrap {
+            margin-top: 12px;
+        }
+
+        .action-row {
+            align-items: center;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .action-note {
+            color: #cbd5e1;
+            font-size: 0.85rem;
+            min-height: 1.2em;
+        }
+
+        .alert {
+            border-radius: 12px;
+            font-size: 0.9rem;
+            margin-bottom: 14px;
+            padding: 10px 12px;
+        }
+
+        .alert.info {
+            background: rgba(59, 130, 246, 0.16);
+            border: 1px solid rgba(96, 165, 250, 0.32);
+            color: #dbeafe;
+        }
+
+        .alert.warn {
+            background: rgba(245, 158, 11, 0.16);
+            border: 1px solid rgba(251, 191, 36, 0.36);
+            color: #fde68a;
+        }
+
+        .alert.error {
+            background: rgba(239, 68, 68, 0.16);
+            border: 1px solid rgba(248, 113, 113, 0.36);
+            color: #fecaca;
+        }
+
+        .split-panels {
+            display: grid;
+            gap: 16px;
+            grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+        }
+
+        .channel-grid {
+            display: grid;
+            gap: 14px;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        }
+
+        .channel-card {
+            border: 1px solid var(--wr-border);
+            border-radius: 14px;
+            padding: 14px;
+            background: var(--wr-panel-soft);
+        }
+
+        .channel-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .channel-title {
+            font-weight: 700;
+            font-size: 1rem;
+            color: var(--wr-text);
+        }
+
+        .channel-summary {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 6px 10px;
+            margin-bottom: 10px;
+            font-size: 0.84rem;
+        }
+
+        .channel-summary-item {
+            color: var(--wr-text);
+        }
+
+        .channel-events {
+            border-top: 1px solid var(--wr-border);
+            margin-top: 8px;
+            padding-top: 8px;
+            display: grid;
+            gap: 6px;
+        }
+
+        .channel-event {
+            font-size: 0.8rem;
+            color: var(--wr-muted);
+        }
+
+        .swarm-link {
+            background: transparent;
+            border: 0;
+            color: #bfdbfe;
+            cursor: pointer;
+            font: inherit;
+            padding: 0;
+            text-align: left;
+        }
+
+        .code-block {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            border-radius: 12px;
+            color: #cbd5e1;
+            font-size: 0.84rem;
+            max-height: 320px;
+            overflow: auto;
+            padding: 12px;
+            white-space: pre-wrap;
+        }
+
+        @media (max-width: 980px) {
+            .split-panels {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <section class="hero">
+            <div class="eyebrow">Laboratorio aislado</div>
+            <h1>Metiche OS Lab Dashboard</h1>
+            <div class="subtitle">Esta vista corre aparte del dashboard de producción. Usa datos del laboratorio técnico y resume cola, fallback, escalamiento y estado operativo en vivo.</div>
+            <div class="badge-row">
+                <div class="badge">Producción reservada: 5050 y 5052</div>
+                <div class="badge">Laboratorio local: 5063</div>
+                <div class="badge" id="lab-status">Metiche OS: verificando…</div>
+            </div>
+        </section>
+        <div class="alert hidden" id="overview-alert"></div>
+
+        <section class="grid">
+            <article class="card">
+                <div class="label">Tareas totales</div>
+                <div class="value" id="total-tasks">-</div>
+                <div class="subvalue">Historial visible del laboratorio</div>
+            </article>
+            <article class="card">
+                <div class="label">Cola activa</div>
+                <div class="value" id="queue-depth">-</div>
+                <div class="subvalue">Misiones pendientes en worker</div>
+            </article>
+            <article class="card">
+                <div class="label">Fallbacks</div>
+                <div class="value" id="fallback-tasks">-</div>
+                <div class="subvalue">Misiones que cambiaron de motor</div>
+            </article>
+            <article class="card">
+                <div class="label">Fallidas</div>
+                <div class="value" id="failed-tasks">-</div>
+                <div class="subvalue">Escaladas o detenidas para revisión</div>
+            </article>
+            <article class="card">
+                <div class="label">Tasa de validación</div>
+                <div class="value" id="validation-rate">-</div>
+                <div class="subvalue">`validated / total`</div>
+            </article>
+            <article class="card">
+                <div class="label">Edad del snapshot</div>
+                <div class="value" id="snapshot-age">-</div>
+                <div class="subvalue">Tiempo desde `generated_at`</div>
+            </article>
+        </section>
+
+        <section class="panel" id="legacy-ops-panel">
+            <h2>Estado operativo</h2>
+            <div class="meta" id="generated-at">Actualizando…</div>
+            <div class="kv">
+                <div class="kv-item">
+                    <div class="kv-key">Base del laboratorio</div>
+                    <div class="kv-value" id="base-url">-</div>
+                </div>
+                <div class="kv-item">
+                    <div class="kv-key">Resumen de estados</div>
+                    <div class="kv-value" id="status-counts">-</div>
+                </div>
+                <div class="kv-item">
+                    <div class="kv-key">Motores finales</div>
+                    <div class="kv-value" id="engine-counts">-</div>
+                </div>
+                <div class="kv-item">
+                    <div class="kv-key">Rutas activas</div>
+                    <div class="kv-value" id="route-counts">-</div>
+                </div>
+                <div class="kv-item">
+                    <div class="kv-key">Fuente de datos</div>
+                    <div class="kv-value" id="data-source">-</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" id="legacy-recent-panel">
+            <h2>Tareas recientes del laboratorio</h2>
+            <div class="controls">
+                <input class="input" id="task-id-input" placeholder="Pega task_id para ver detalle" />
+                <button class="btn" id="load-task-detail" type="button">Ver detalle</button>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Título</th>
+                        <th>Tipo</th>
+                        <th>Modo</th>
+                        <th>Estado</th>
+                        <th>Actualización</th>
+                    </tr>
+                </thead>
+                <tbody id="recent-rows">
+                    <tr>
+                        <td colspan="6">Cargando tareas…</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section class="panel" id="swarm-launch-panel">
+            <h2>Detalle de tarea</h2>
+            <div class="alert hidden" id="detail-alert"></div>
+            <div class="meta" id="detail-meta">Selecciona una tarea para consultar route, dispatch, escalation y flow.</div>
+            <div class="controls">
+                <button class="btn secondary active detail-view-btn" data-view="full" type="button">Completo</button>
+                <button class="btn secondary detail-view-btn" data-view="flow" type="button">Flow</button>
+                <button class="btn secondary detail-view-btn" data-view="route" type="button">Route</button>
+                <button class="btn secondary detail-view-btn" data-view="dispatch" type="button">Dispatch</button>
+                <button class="btn secondary detail-view-btn" data-view="escalation" type="button">Escalation</button>
+            </div>
+            <div class="action-row">
+                <button class="btn secondary" id="action-rerun-task" type="button">Re-ejecutar</button>
+                <button class="btn secondary" id="action-requeue-task" type="button">Re-encolar</button>
+                <button class="btn secondary" id="action-process-next" type="button">Procesar siguiente</button>
+                <span class="action-note" id="detail-action-note"></span>
+            </div>
+            <div class="meta" id="detail-api-links">Vista amigable activa. Cambia con los botones.</div>
+            <div class="kv">
+                <div class="kv-item">
+                    <div class="kv-key">Task ID</div>
+                    <div class="kv-value" id="detail-task-id">-</div>
+                </div>
+                <div class="kv-item">
+                    <div class="kv-key">Estado actual</div>
+                    <div class="kv-value" id="detail-status">-</div>
+                </div>
+                <div class="kv-item">
+                    <div class="kv-key">Ruta</div>
+                    <div class="kv-value" id="detail-route">-</div>
+                </div>
+                <div class="kv-item">
+                    <div class="kv-key">Motor final</div>
+                    <div class="kv-value" id="detail-engine">-</div>
+                </div>
+                <div class="kv-item">
+                    <div class="kv-key">Escalamiento</div>
+                    <div class="kv-value" id="detail-escalation">-</div>
+                </div>
+                <div class="kv-item">
+                    <div class="kv-key">Cola</div>
+                    <div class="kv-value" id="detail-queue">-</div>
+                </div>
+            </div>
+            <div class="detail-render" id="detail-render">
+                <div class="detail-card">
+                    <h3>Detalle</h3>
+                    <div class="detail-value">Sin consulta todavía.</div>
+                </div>
+            </div>
+            <details class="debug-wrap">
+                <summary>Debug JSON (opcional)</summary>
+                <pre class="detail-json" id="detail-json">Sin consulta todavía.</pre>
+            </details>
+        </section>
+
+        <section class="panel" id="swarm-history-panel">
+            <h2>Lanzar Enjambre</h2>
+            <div class="alert hidden" id="swarm-launch-alert"></div>
+            <div class="meta">Crea y ejecuta un enjambre en un solo flujo: `POST /swarm` y luego `POST /swarm/{id}/run`.</div>
+            <div class="kv">
+                <div class="kv-item">
+                    <div class="kv-key">Nombre</div>
+                    <input class="input" id="swarm-name" placeholder="Ej: Enjambre Riesgo Operativo" />
+                </div>
+                <div class="kv-item">
+                    <div class="kv-key">Policy</div>
+                    <select class="input" id="swarm-policy">
+                        <option value="narrative-consensus">narrative-consensus</option>
+                        <option value="majority">majority</option>
+                        <option value="leader-follower">leader-follower</option>
+                    </select>
+                </div>
+                <div class="kv-item">
+                    <div class="kv-key">Agents (coma separada)</div>
+                    <input class="input" id="swarm-agents" placeholder="whatsapp, shopify" value="whatsapp, shopify" />
+                </div>
+                <div class="kv-item">
+                    <div class="kv-key">Max cycles</div>
+                    <input class="input" id="swarm-max-cycles" type="number" min="1" max="5" value="3" />
+                </div>
+            </div>
+            <div class="kv" style="margin-top: 12px;">
+                <div class="kv-item">
+                    <div class="kv-key">Goal</div>
+                    <textarea class="input textarea" id="swarm-goal" placeholder="Objetivo del enjambre">Coordinar respuesta operativa de canales ante incidencia nocturna.</textarea>
+                </div>
+                <div class="kv-item">
+                    <div class="kv-key">Objective de ejecución</div>
+                    <textarea class="input textarea" id="swarm-objective" placeholder="Objetivo puntual para run">Evaluar riesgo y definir plan de acción para whatsapp y shopify.</textarea>
+                </div>
+            </div>
+            <div class="action-row">
+                <button class="btn" id="swarm-run-btn" type="button">Ejecutar</button>
+                <button class="btn secondary" id="swarm-refresh-btn" type="button">Actualizar Enjambres</button>
+                <span class="action-note" id="swarm-action-note"></span>
+            </div>
+        </section>
+
+        <section class="panel" id="channels-status-panel">
+            <h2>Estado de Canales</h2>
+            <div class="meta" id="channels-meta">Cargando salud de WhatsApp y Telegram…</div>
+            <div class="channel-grid" id="channels-grid">
+                <article class="channel-card">
+                    <div class="channel-card-header">
+                        <div class="channel-title">Inicializando…</div>
+                        <span class="pill warn">cargando</span>
+                    </div>
+                    <div class="channel-summary">
+                        <div class="channel-summary-item">Esperando datos de canales.</div>
+                    </div>
+                </article>
+            </div>
+        </section>
+
+        <section class="panel" id="legacy-detail-panel">
+            <h2>Enjambres Recientes</h2>
+            <div class="split-panels">
+                <div>
+                    <div class="meta" id="swarm-list-meta">Cargando enjambres…</div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Agents</th>
+                                <th>Policy</th>
+                                <th>Estado</th>
+                                <th>Actualizado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="swarm-recent-rows">
+                            <tr>
+                                <td colspan="5">Cargando enjambres…</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div>
+                    <h2 style="font-size: 1.05rem; margin-bottom: 10px;">Historial del Enjambre</h2>
+                    <div class="alert hidden" id="swarm-history-alert"></div>
+                    <div class="meta" id="swarm-history-meta">Selecciona un enjambre para cargar su historial completo.</div>
+                    <pre class="code-block" id="swarm-history-json">Sin historial cargado.</pre>
+                </div>
+            </div>
+        </section>
+
+        <div class="footer">Preview de laboratorio independiente del dashboard productivo.</div>
+    </div>
+
+    <script>
+        let lastOverview = null;
+        let currentDetailPayload = null;
+        let currentDetailView = "full";
+        let refreshTimer = null;
+        let swarmRefreshTimer = null;
+        let channelRefreshTimer = null;
+        let selectedSwarmId = "";
+        const TASK_ID_STORAGE_KEY = "metiche_lab_last_task_id";
+
+        function formatCounts(value) {
+            const entries = Object.entries(value || {});
+            if (!entries.length) return "Sin datos";
+            return entries.map(([key, count]) => `${key}: ${count}`).join(" · ");
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? "")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+
+        function statusClass(status) {
+            if (status === "validated" || status === "passed") return "ok";
+            if (status === "failed") return "fail";
+            return "warn";
+        }
+
+        function formatPercent(value, total) {
+            if (!Number.isFinite(value) || !Number.isFinite(total) || total <= 0) return "0.0%";
+            return `${((value / total) * 100).toFixed(1)}%`;
+        }
+
+        function formatAgeFromIso(isoDate) {
+            if (!isoDate) return "N/A";
+            const ts = new Date(isoDate).getTime();
+            if (!Number.isFinite(ts)) return "N/A";
+            const diffMs = Date.now() - ts;
+            if (diffMs < 0) return "0s";
+            const sec = Math.floor(diffMs / 1000);
+            if (sec < 60) return `${sec}s`;
+            const min = Math.floor(sec / 60);
+            if (min < 60) return `${min}m`;
+            const hr = Math.floor(min / 60);
+            return `${hr}h`;
+        }
+
+        function setAlert(id, level, message) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (!message) {
+                el.className = "alert hidden";
+                el.textContent = "";
+                return;
+            }
+            el.className = `alert ${level || "info"}`;
+            el.textContent = message;
+        }
+
+        function setActionNote(message) {
+            document.getElementById("detail-action-note").textContent = message || "";
+        }
+
+        function persistTaskId(taskId) {
+            try {
+                const value = String(taskId || "").trim();
+                if (!value) return;
+                localStorage.setItem(TASK_ID_STORAGE_KEY, value);
+            } catch {}
+        }
+
+        function clearPersistedTaskId() {
+            try {
+                localStorage.removeItem(TASK_ID_STORAGE_KEY);
+            } catch {}
+        }
+
+        function loadPersistedTaskId() {
+            try {
+                return localStorage.getItem(TASK_ID_STORAGE_KEY) || "";
+            } catch {
+                return "";
+            }
+        }
+
+        function updateDetailApiLinks(taskId) {
+            const linksEl = document.getElementById("detail-api-links");
+            if (!taskId || !lastOverview?.baseUrl) {
+                linksEl.textContent = "Vista amigable activa. Cambia con los botones.";
+                return;
+            }
+            linksEl.textContent = `Task ${taskId.slice(0, 8)}… cargada en vista amigable (${currentDetailView}).`;
+        }
+
+        function safeText(value) {
+            if (value === null || value === undefined || value === "") return "-";
+            if (typeof value === "boolean") return value ? "Sí" : "No";
+            return String(value);
+        }
+
+        function renderDetailCard(title, pairs) {
+            const items = pairs.map(([key, value]) => `
+                <div class="detail-item">
+                    <div class="detail-key">${escapeHtml(key)}</div>
+                    <div class="detail-value">${escapeHtml(safeText(value))}</div>
+                </div>
+            `).join("");
+            return `
+                <section class="detail-card">
+                    <h3>${escapeHtml(title)}</h3>
+                    <div class="detail-grid">${items || '<div class="detail-value">Sin datos.</div>'}</div>
+                </section>
+            `;
+        }
+
+        function renderCurrentDetailView() {
+            const renderEl = document.getElementById("detail-render");
+            const pre = document.getElementById("detail-json");
+            if (!currentDetailPayload) {
+                renderEl.innerHTML = `
+                    <section class="detail-card">
+                        <h3>Detalle</h3>
+                        <div class="detail-value">Sin consulta todavía.</div>
+                    </section>
+                `;
+                pre.textContent = "Sin consulta todavía.";
+                return;
+            }
+            const view = currentDetailView;
+            const task = currentDetailPayload.task || {};
+            const route = currentDetailPayload.route || {};
+            const dispatch = currentDetailPayload.dispatch || {};
+            const escalation = currentDetailPayload.escalation || {};
+            const flow = currentDetailPayload.flow || {};
+            let html = "";
+            if (view === "full") {
+                html += renderDetailCard("Task", [
+                    ["ID", task.id],
+                    ["Título", task.title],
+                    ["Tipo", task.task_type],
+                    ["Modo", task.execution_mode],
+                    ["Estado", task.status]
+                ]);
+                html += renderDetailCard("Route", [
+                    ["Familia", route.route_family],
+                    ["Canal", route.channel],
+                    ["Target engine", route.target_engine],
+                    ["Regla", route.matched_rule_code]
+                ]);
+                html += renderDetailCard("Dispatch", [
+                    ["Primary", dispatch.primary_engine],
+                    ["Fallback", dispatch.fallback_engine],
+                    ["Final", dispatch.final_engine],
+                    ["Fallback usado", dispatch.fallback_used],
+                    ["Estado dispatch", dispatch.dispatch_status]
+                ]);
+                html += renderDetailCard("Escalation", [
+                    ["Nivel", escalation.escalation_level],
+                    ["Owner actual", escalation.current_owner],
+                    ["Siguiente owner", escalation.next_owner],
+                    ["Requiere review", escalation.requires_review]
+                ]);
+            } else if (view === "flow") {
+                html += renderDetailCard("Flow - Task", [
+                    ["ID", flow.task?.id],
+                    ["Título", flow.task?.title],
+                    ["Estado", flow.task?.status]
+                ]);
+                html += renderDetailCard("Flow - Decision", [
+                    ["Path", flow.decision?.chosen_path],
+                    ["Rationale", flow.decision?.rationale]
+                ]);
+                html += renderDetailCard("Flow - Execution", [
+                    ["Actor", flow.execution?.actor_code],
+                    ["Estado", flow.execution?.status],
+                    ["Resumen", flow.execution?.summary]
+                ]);
+                html += renderDetailCard("Flow - Validation", [
+                    ["Validator", flow.validation?.validator_code],
+                    ["Estado", flow.validation?.status],
+                    ["Notas", flow.validation?.notes]
+                ]);
+            } else if (view === "route") {
+                html += renderDetailCard("Route", [
+                    ["Task", route.task_id],
+                    ["Familia", route.route_family],
+                    ["Canal", route.channel],
+                    ["Target actor", route.target_actor],
+                    ["Target engine", route.target_engine],
+                    ["Regla", route.matched_rule_code],
+                    ["Rationale", route.rationale]
+                ]);
+            } else if (view === "dispatch") {
+                html += renderDetailCard("Dispatch", [
+                    ["Task", dispatch.task_id],
+                    ["Primary", dispatch.primary_engine],
+                    ["Fallback", dispatch.fallback_engine],
+                    ["Final", dispatch.final_engine],
+                    ["Fallback usado", dispatch.fallback_used],
+                    ["Estado", dispatch.dispatch_status]
+                ]);
+            } else if (view === "escalation") {
+                html += renderDetailCard("Escalation", [
+                    ["Task", escalation.task_id],
+                    ["Nivel", escalation.escalation_level],
+                    ["Owner actual", escalation.current_owner],
+                    ["Siguiente owner", escalation.next_owner],
+                    ["Review", escalation.requires_review],
+                    ["Razón", escalation.reason]
+                ]);
+            }
+            renderEl.innerHTML = html || `<section class="detail-card"><h3>Detalle</h3><div class="detail-value">Sin datos.</div></section>`;
+            let viewPayload = currentDetailPayload;
+            if (view === "flow") viewPayload = flow;
+            if (view === "route") viewPayload = route;
+            if (view === "dispatch") viewPayload = dispatch;
+            if (view === "escalation") viewPayload = escalation;
+            pre.textContent = JSON.stringify(viewPayload, null, 2);
+        }
+
+        function setDetailView(view) {
+            currentDetailView = view;
+            const buttons = document.querySelectorAll(".detail-view-btn");
+            buttons.forEach((btn) => {
+                const isActive = btn.dataset.view === view;
+                btn.classList.toggle("active", isActive);
+            });
+            renderCurrentDetailView();
+        }
+
+        async function fetchJsonWithTimeout(url, timeoutMs = 7000, options = {}) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs);
+            try {
+                const response = await fetch(url, {
+                    cache: "no-store",
+                    ...options,
+                    signal: controller.signal
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(payload?.error || payload?.detail || `HTTP ${response.status}`);
+                }
+                return payload;
+            } catch (error) {
+                if (error.name === "AbortError") {
+                    throw new Error(`Timeout (${timeoutMs}ms) consultando ${url}`);
+                }
+                throw error;
+            } finally {
+                clearTimeout(timer);
+            }
+        }
+
+        function renderOverview(payload) {
+            const overview = payload.overview || {};
+            const totalTasks = Number(overview.total_tasks || 0);
+            const failedTasks = Number(overview.failed_tasks || 0);
+            const fallbackTasks = Number(overview.fallback_tasks || 0);
+            const validatedTasks = Number((overview.status_counts || {}).validated || 0);
+            const snapshotAge = formatAgeFromIso(overview.generated_at);
+            const generatedLabel = overview.generated_at
+                ? `Generado: ${new Date(overview.generated_at).toLocaleString("es-MX")} · edad ${snapshotAge}`
+                : "Sin marca de tiempo";
+
+            document.getElementById("lab-status").textContent = payload.online ? "Metiche OS: en línea" : "Metiche OS: fuera de línea";
+            document.getElementById("total-tasks").textContent = totalTasks;
+            document.getElementById("queue-depth").textContent = overview.queue_depth ?? "-";
+            document.getElementById("fallback-tasks").textContent = fallbackTasks;
+            document.getElementById("failed-tasks").textContent = failedTasks;
+            document.getElementById("validation-rate").textContent = formatPercent(validatedTasks, totalTasks);
+            document.getElementById("snapshot-age").textContent = snapshotAge;
+            document.getElementById("base-url").textContent = payload.baseUrl || "-";
+            document.getElementById("generated-at").textContent = generatedLabel;
+            document.getElementById("status-counts").textContent = formatCounts(overview.status_counts);
+            document.getElementById("engine-counts").textContent = formatCounts(overview.engine_counts);
+            document.getElementById("route-counts").textContent = formatCounts(overview.route_counts);
+            document.getElementById("data-source").textContent = payload.online ? "metiche-os (docker)" : "sin conexión";
+
+            const rows = Array.isArray(overview.recent_tasks) ? overview.recent_tasks : [];
+            const tbody = document.getElementById("recent-rows");
+            if (!rows.length) {
+                tbody.innerHTML = '<tr><td colspan="6">No hay tareas recientes.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = rows.map((task) => `
+                <tr>
+                    <td><code>${escapeHtml(task.id || "-")}</code></td>
+                    <td><button class="task-link" data-task-id="${escapeHtml(task.id || "")}" type="button">${escapeHtml(task.title || "-")}</button></td>
+                    <td>${escapeHtml(task.task_type || "-")}</td>
+                    <td>${escapeHtml(task.execution_mode || "-")}</td>
+                    <td><span class="pill ${statusClass(task.status)}">${task.status || "-"}</span></td>
+                    <td>${task.updated_at ? new Date(task.updated_at).toLocaleString("es-MX") : "-"}</td>
+                </tr>
+            `).join("");
+
+            const firstTaskId = rows[0]?.id;
+            if (firstTaskId && !document.getElementById("task-id-input").value.trim()) {
+                document.getElementById("task-id-input").value = firstTaskId;
+                persistTaskId(firstTaskId);
+            }
+        }
+
+        function scheduleNextRefresh(overview) {
+            if (refreshTimer) clearTimeout(refreshTimer);
+            const queueDepth = Number(overview?.queue_depth || 0);
+            const nextMs = queueDepth > 0 ? 5000 : 15000;
+            refreshTimer = setTimeout(() => {
+                loadDashboard();
+            }, nextMs);
+        }
+
+        function setSwarmActionNote(message) {
+            document.getElementById("swarm-action-note").textContent = message || "";
+        }
+
+        function swarmStatusClass(status) {
+            if (status === "completed") return "ok";
+            if (status === "failed" || status === "cancelled") return "fail";
+            return "warn";
+        }
+
+        function channelHealthClass(item) {
+            const status = String(item?.status || "").toLowerCase();
+            const totalEvents = Number(item?.summary?.total_events || 0);
+            if (status === "green") return "ok";
+            if (status === "red" && totalEvents === 0) return "warn";
+            return "fail";
+        }
+
+        function channelHealthLabel(item) {
+            const status = String(item?.status || "").toLowerCase();
+            const totalEvents = Number(item?.summary?.total_events || 0);
+            if (status === "green") return "green";
+            if (status === "red" && totalEvents === 0) return "sin señal";
+            return "red";
+        }
+
+        function renderChannelCards(channels, eventsMap) {
+            const grid = document.getElementById("channels-grid");
+            if (!grid) return;
+            if (!Array.isArray(channels) || !channels.length) {
+                grid.innerHTML = `
+                    <article class="channel-card">
+                        <div class="channel-card-header">
+                            <div class="channel-title">Sin datos</div>
+                            <span class="pill fail">rojo</span>
+                        </div>
+                        <div class="channel-summary">
+                            <div class="channel-summary-item">No hay actividad registrada para canales.</div>
+                        </div>
+                    </article>
+                `;
+                return;
+            }
+            grid.innerHTML = channels.map((item) => {
+                const channel = String(item.channel || "").toLowerCase();
+                const summary = item.summary || {};
+                const events = Array.isArray(eventsMap?.[channel]) ? eventsMap[channel] : [];
+                const eventsHtml = events.length
+                    ? events.map((event) => `
+                        <div class="channel-event">
+                            <code>${escapeHtml(event.event_type || "-")}</code> · ${escapeHtml(event.summary || "-")} · ${event.occurred_at ? new Date(event.occurred_at).toLocaleString("es-MX") : "-"}
+                        </div>
+                    `).join("")
+                    : '<div class="channel-event">Sin eventos recientes.</div>';
+                return `
+                    <article class="channel-card">
+                        <div class="channel-card-header">
+                            <div class="channel-title">${escapeHtml(item.label || channel || "Canal")}</div>
+                            <span class="pill ${channelHealthClass(item)}">${escapeHtml(channelHealthLabel(item))}</span>
+                        </div>
+                        <div class="channel-summary">
+                            <div class="channel-summary-item">Eventos: <strong>${Number(summary.total_events || 0)}</strong></div>
+                            <div class="channel-summary-item">Envíos: <strong>${Number(summary.send_messages || 0)}</strong></div>
+                            <div class="channel-summary-item">Memoria R/W: <strong>${Number(summary.memory_reads || 0)}/${Number(summary.memory_writes || 0)}</strong></div>
+                            <div class="channel-summary-item">Sandbox/Bloqueos: <strong>${Number(summary.sandbox_actions || 0)}/${Number(summary.security_blocks || 0)}</strong></div>
+                            <div class="channel-summary-item">Último evento: <strong>${item.last_event_at ? new Date(item.last_event_at).toLocaleString("es-MX") : "N/A"}</strong></div>
+                        </div>
+                        <div class="channel-events">${eventsHtml}</div>
+                    </article>
+                `;
+            }).join("");
+        }
+
+        async function loadChannelsDashboard() {
+            const metaEl = document.getElementById("channels-meta");
+            if (!metaEl) return;
+            try {
+                const statusPayload = await fetchJsonWithTimeout("/dashboard/channels/status?event_preview_limit=4", 9000);
+                const channels = Array.isArray(statusPayload.channels) ? statusPayload.channels : [];
+                const eventsByChannel = {};
+                await Promise.all(channels.map(async (item) => {
+                    const channel = String(item.channel || "").toLowerCase();
+                    if (!channel) return;
+                    try {
+                        const eventsPayload = await fetchJsonWithTimeout(
+                            `/dashboard/channels/events?channel=${encodeURIComponent(channel)}&limit=5`,
+                            9000
+                        );
+                        eventsByChannel[channel] = Array.isArray(eventsPayload.items) ? eventsPayload.items : [];
+                    } catch {
+                        eventsByChannel[channel] = Array.isArray(item.last_events) ? item.last_events : [];
+                    }
+                }));
+                metaEl.textContent = `Actualizado: ${new Date(statusPayload.generated_at || Date.now()).toLocaleString("es-MX")} · Canales: ${channels.length}`;
+                renderChannelCards(channels, eventsByChannel);
+            } catch (error) {
+                metaEl.textContent = `No se pudo cargar estado de canales: ${error.message}`;
+                renderChannelCards([], {});
+            } finally {
+                if (channelRefreshTimer) clearTimeout(channelRefreshTimer);
+                channelRefreshTimer = setTimeout(() => {
+                    loadChannelsDashboard();
+                }, 12000);
+            }
+        }
+
+        function parseSwarmAgents(input) {
+            const raw = String(input || "").trim();
+            if (!raw) return [];
+            const pieces = raw.split(",").map((item) => item.trim().toLowerCase()).filter(Boolean);
+            return [...new Set(pieces)];
+        }
+
+        async function loadSwarmHistory(swarmId) {
+            const cleanSwarmId = String(swarmId || "").trim();
+            if (!cleanSwarmId) return;
+            selectedSwarmId = cleanSwarmId;
+            setAlert("swarm-history-alert", null, "");
+            document.getElementById("swarm-history-meta").textContent = `Cargando historial de ${cleanSwarmId.slice(0, 8)}…`;
+            try {
+                const payload = await fetchJsonWithTimeout(`/swarm/${encodeURIComponent(cleanSwarmId)}/history`, 9000);
+                document.getElementById("swarm-history-meta").textContent =
+                    `Swarm ${payload.swarm?.name || cleanSwarmId} · ciclos: ${payload.total_cycles}`;
+                document.getElementById("swarm-history-json").textContent = JSON.stringify(payload, null, 2);
+            } catch (error) {
+                document.getElementById("swarm-history-meta").textContent = "No se pudo cargar historial";
+                setAlert("swarm-history-alert", "error", `Historial no disponible: ${error.message}`);
+            }
+        }
+
+        async function loadRecentSwarms(preferredSwarmId = "") {
+            try {
+                const rows = await fetchJsonWithTimeout("/swarm?limit=15", 9000);
+                const list = Array.isArray(rows) ? rows : [];
+                document.getElementById("swarm-list-meta").textContent = `${list.length} enjambre(s) recientes`;
+                const tbody = document.getElementById("swarm-recent-rows");
+                if (!list.length) {
+                    tbody.innerHTML = '<tr><td colspan="5">No hay enjambres recientes.</td></tr>';
+                    document.getElementById("swarm-history-meta").textContent = "Sin enjambres para mostrar historial.";
+                    return;
+                }
+                tbody.innerHTML = list.map((item) => `
+                    <tr>
+                        <td><button class="swarm-link" data-swarm-id="${escapeHtml(item.id || "")}" type="button">${escapeHtml(item.name || "-")}</button></td>
+                        <td>${escapeHtml((item.members || []).join(", ") || "-")}</td>
+                        <td>${escapeHtml(item.policy || "-")}</td>
+                        <td><span class="pill ${swarmStatusClass(item.status)}">${escapeHtml(item.status || "-")}</span></td>
+                        <td>${item.updated_at ? new Date(item.updated_at).toLocaleString("es-MX") : "-"}</td>
+                    </tr>
+                `).join("");
+                const nextSwarmId = preferredSwarmId || selectedSwarmId || list[0]?.id || "";
+                if (nextSwarmId) {
+                    await loadSwarmHistory(nextSwarmId);
+                }
+            } catch (error) {
+                document.getElementById("swarm-list-meta").textContent = "Error cargando enjambres";
+                document.getElementById("swarm-recent-rows").innerHTML =
+                    `<tr><td colspan="5">${escapeHtml(error.message)}</td></tr>`;
+                setAlert("swarm-history-alert", "warn", `No fue posible refrescar historial: ${error.message}`);
+            } finally {
+                scheduleSwarmRefresh();
+            }
+        }
+
+        function scheduleSwarmRefresh() {
+            if (swarmRefreshTimer) clearTimeout(swarmRefreshTimer);
+            swarmRefreshTimer = setTimeout(() => {
+                loadRecentSwarms(selectedSwarmId);
+            }, 12000);
+        }
+
+        async function launchSwarmFromDashboard() {
+            const runBtn = document.getElementById("swarm-run-btn");
+            const name = document.getElementById("swarm-name").value.trim();
+            const goal = document.getElementById("swarm-goal").value.trim();
+            const policy = document.getElementById("swarm-policy").value;
+            const agents = parseSwarmAgents(document.getElementById("swarm-agents").value);
+            const objective = document.getElementById("swarm-objective").value.trim();
+            const maxCycles = Number(document.getElementById("swarm-max-cycles").value || 1);
+
+            if (!name || !goal || !agents.length) {
+                setAlert("swarm-launch-alert", "warn", "Completa name, goal y agents antes de ejecutar.");
+                return;
+            }
+
+            setAlert("swarm-launch-alert", null, "");
+            setSwarmActionNote("Creando swarm...");
+            runBtn.disabled = true;
+            try {
+                const created = await fetchJsonWithTimeout("/swarm", 9000, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        name,
+                        goal,
+                        policy,
+                        agents
+                    })
+                });
+                setSwarmActionNote(`Swarm creado (${created.id?.slice(0, 8)}…), ejecutando...`);
+                const runData = await fetchJsonWithTimeout(`/swarm/${encodeURIComponent(created.id)}/run`, 12000, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        objective: objective || goal,
+                        max_cycles: Number.isFinite(maxCycles) ? Math.min(5, Math.max(1, maxCycles)) : 1,
+                        client_key: "dashboard-war-room"
+                    })
+                });
+                setAlert(
+                    "swarm-launch-alert",
+                    "info",
+                    `Swarm ejecutado. decision=${runData.decision}, stop_reason=${runData.stop_reason}, cycles=${runData.cycles_executed}`
+                );
+                setSwarmActionNote("Ejecución completada.");
+                await loadRecentSwarms(created.id);
+            } catch (error) {
+                setAlert("swarm-launch-alert", "error", `No se pudo ejecutar el enjambre: ${error.message}`);
+                setSwarmActionNote("Ejecución fallida.");
+            } finally {
+                runBtn.disabled = false;
+            }
+        }
+
+        async function loadTaskDetail(taskId) {
+            const cleanTaskId = String(taskId || "").trim();
+            if (!cleanTaskId) return;
+            setAlert("detail-alert", null, "");
+            document.getElementById("detail-meta").textContent = "Consultando detalle...";
+            document.getElementById("detail-task-id").textContent = cleanTaskId;
+            try {
+                const payload = await fetchJsonWithTimeout(`/api/labs/metiche-os/task-detail?taskId=${encodeURIComponent(cleanTaskId)}`, 6500);
+                const task = payload.task || {};
+                const route = payload.route || {};
+                const dispatch = payload.dispatch || {};
+                const escalation = payload.escalation || {};
+                const queueEntries = Array.isArray(payload.queue_entries) ? payload.queue_entries : [];
+                document.getElementById("detail-meta").textContent = "Detalle operativo cargado";
+                document.getElementById("detail-task-id").textContent = payload.task_id || cleanTaskId;
+                document.getElementById("detail-status").textContent = task.status || "-";
+                document.getElementById("detail-route").textContent = route.route_family || route.target_engine || "-";
+                document.getElementById("detail-engine").textContent = dispatch.final_engine || dispatch.primary_engine || "-";
+                document.getElementById("detail-escalation").textContent = escalation.escalation_level || "normal";
+                document.getElementById("detail-queue").textContent = queueEntries.length ? `${queueEntries.length} registro(s)` : "Sin registros";
+                currentDetailPayload = payload;
+                updateDetailApiLinks(payload.task_id || cleanTaskId);
+                renderCurrentDetailView();
+            } catch (error) {
+                document.getElementById("detail-meta").textContent = "No se pudo cargar el detalle";
+                const message = String(error?.message || "");
+                const taskMissing = /tarea no encontrada|http 404/i.test(message);
+                if (taskMissing) {
+                    const input = document.getElementById("task-id-input");
+                    if (input?.value?.trim() === cleanTaskId) {
+                        input.value = "";
+                    }
+                    clearPersistedTaskId();
+                    currentDetailPayload = null;
+                    updateDetailApiLinks("");
+                    renderCurrentDetailView();
+                    setAlert("detail-alert", "warn", "La tarea ya no existe. Se limpió el taskId guardado para evitar reintentos automáticos.");
+                    return;
+                }
+                setAlert("detail-alert", "error", `Detalle no disponible: ${error.message}`);
+            }
+        }
+
+        async function postDashboardAction(action, taskId = "") {
+            const response = await fetch("/api/labs/metiche-os/action", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action, taskId })
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || payload?.ok === false) {
+                throw new Error(payload?.error || `Falló acción ${action}`);
+            }
+            return payload;
+        }
+
+        async function loadDashboard() {
+            try {
+                const payload = await fetchJsonWithTimeout("/api/labs/metiche-os/overview", 7000);
+                lastOverview = payload;
+                setAlert("overview-alert", null, "");
+                renderOverview(payload);
+                const inputTaskId = document.getElementById("task-id-input").value.trim();
+                if (inputTaskId) {
+                    loadTaskDetail(inputTaskId);
+                }
+                scheduleNextRefresh(payload.overview || {});
+                return true;
+            } catch (error) {
+                document.getElementById("lab-status").textContent = "Metiche OS: error";
+                const staleMode = Boolean(lastOverview);
+                if (staleMode) {
+                    setAlert("overview-alert", "warn", `Error refrescando overview: ${error.message}. Mostrando último snapshot válido.`);
+                    renderOverview(lastOverview);
+                } else {
+                    setAlert("overview-alert", "error", `Overview no disponible: ${error.message}`);
+                    document.getElementById("recent-rows").innerHTML = `<tr><td colspan="6">${error.message}</td></tr>`;
+                }
+                scheduleNextRefresh(lastOverview?.overview || {});
+                return false;
+            }
+        }
+
+        function isSwarmConsoleMode() {
+            const params = new URLSearchParams(window.location.search || "");
+            return (
+                params.get("view") === "swarm" ||
+                window.location.pathname.endsWith("/swarm-console.html") ||
+                window.location.pathname.endsWith("/admin-dashboard.html")
+            );
+        }
+
+        function applySwarmConsoleMode() {
+            if (!isSwarmConsoleMode()) return;
+            const setTheme = (theme) => {
+                const normalized = theme === "light" ? "light" : "dark";
+                document.body.classList.toggle("light", normalized === "light");
+                localStorage.setItem("warroom_theme", normalized);
+                const toggleBtn = document.getElementById("swarm-theme-toggle");
+                if (toggleBtn) {
+                    toggleBtn.textContent = normalized === "light" ? "Cambiar a Oscuro" : "Cambiar a Claro";
+                }
+            };
+
+            const theme = localStorage.getItem("warroom_theme") || "dark";
+            setTheme(theme);
+            document.body.classList.add("swarm-console-mode");
+            const visiblePanels = new Set(["swarm-launch-panel", "swarm-history-panel", "channels-status-panel"]);
+            document.querySelectorAll("section.panel").forEach((panel) => {
+                if (!(panel instanceof HTMLElement)) return;
+                if (!visiblePanels.has(panel.id)) {
+                    panel.style.display = "none";
+                }
+            });
+            document.title = "War Room Operativo · Consola de Enjambres";
+            const container = document.querySelector(".container");
+            if (container && !document.getElementById("swarm-console-header")) {
+                const header = document.createElement("section");
+                header.id = "swarm-console-header";
+                header.className = "swarm-console-header";
+                header.innerHTML = `
+                    <div class="swarm-console-headcopy">
+                        <div class="swarm-console-title">War Room Operativo · Consola de Enjambres</div>
+                        <div class="swarm-console-subtitle">Ejecución real de swarms: crear, correr, listar estado e historial completo.</div>
+                    </div>
+                    <button id="swarm-theme-toggle" class="swarm-theme-toggle" type="button">Cambiar tema</button>
+                `;
+                container.prepend(header);
+                const toggle = document.getElementById("swarm-theme-toggle");
+                if (toggle) {
+                    toggle.addEventListener("click", () => {
+                        const isLight = document.body.classList.contains("light");
+                        setTheme(isLight ? "dark" : "light");
+                    });
+                }
+            }
+            setTheme(localStorage.getItem("warroom_theme") || "dark");
+        }
+
+        applySwarmConsoleMode();
+
+        const restoredTaskId = loadPersistedTaskId();
+        if (restoredTaskId) {
+            document.getElementById("task-id-input").value = restoredTaskId;
+        }
+        loadDashboard();
+        loadRecentSwarms();
+        loadChannelsDashboard();
+
+        document.getElementById("load-task-detail").addEventListener("click", () => {
+            const taskId = document.getElementById("task-id-input").value;
+            persistTaskId(taskId);
+            loadTaskDetail(taskId);
+        });
+
+        document.getElementById("recent-rows").addEventListener("click", (event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLElement)) return;
+            if (!target.classList.contains("task-link")) return;
+            const taskId = target.dataset.taskId || "";
+            document.getElementById("task-id-input").value = taskId;
+            persistTaskId(taskId);
+            loadTaskDetail(taskId);
+        });
+
+        document.querySelectorAll(".detail-view-btn").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                const view = btn.dataset.view || "full";
+                setDetailView(view);
+            });
+        });
+
+        document.getElementById("swarm-run-btn").addEventListener("click", async () => {
+            await launchSwarmFromDashboard();
+        });
+
+        document.getElementById("swarm-refresh-btn").addEventListener("click", async () => {
+            setSwarmActionNote("Actualizando lista...");
+            await loadRecentSwarms(selectedSwarmId);
+            setSwarmActionNote("Lista actualizada.");
+        });
+
+        document.getElementById("swarm-recent-rows").addEventListener("click", async (event) => {
+            const target = event.target;
+            if (!(target instanceof HTMLElement)) return;
+            if (!target.classList.contains("swarm-link")) return;
+            const swarmId = target.dataset.swarmId || "";
+            if (!swarmId) return;
+            await loadSwarmHistory(swarmId);
+        });
+
+        document.getElementById("action-rerun-task").addEventListener("click", async () => {
+            const taskId = document.getElementById("detail-task-id").textContent.trim();
+            if (!taskId || taskId === "-") {
+                setActionNote("Selecciona una tarea primero.");
+                return;
+            }
+            setActionNote("Re-ejecutando...");
+            try {
+                await postDashboardAction("rerun-task", taskId);
+                setActionNote("Re-ejecución enviada.");
+                await loadDashboard();
+                await loadTaskDetail(taskId);
+            } catch (error) {
+                setActionNote(`Error: ${error.message}`);
+            }
+        });
+
+        document.getElementById("action-requeue-task").addEventListener("click", async () => {
+            const taskId = document.getElementById("detail-task-id").textContent.trim();
+            if (!taskId || taskId === "-") {
+                setActionNote("Selecciona una tarea primero.");
+                return;
+            }
+            setActionNote("Re-encolando...");
+            try {
+                await postDashboardAction("requeue-task", taskId);
+                setActionNote("Tarea re-encolada.");
+                await loadDashboard();
+                await loadTaskDetail(taskId);
+            } catch (error) {
+                setActionNote(`Error: ${error.message}`);
+            }
+        });
+
+        document.getElementById("action-process-next").addEventListener("click", async () => {
+            setActionNote("Procesando siguiente...");
+            try {
+                await postDashboardAction("process-next");
+                setActionNote("Procesamiento ejecutado.");
+                await loadDashboard();
+                const taskId = document.getElementById("task-id-input").value.trim();
+                if (taskId) {
+                    await loadTaskDetail(taskId);
+                }
+            } catch (error) {
+                setActionNote(`Error: ${error.message}`);
+            }
+        });
+
+        window.addEventListener("beforeunload", () => {
+            if (refreshTimer) clearTimeout(refreshTimer);
+            if (swarmRefreshTimer) clearTimeout(swarmRefreshTimer);
+        });
+    </script>
+</body>
+</html>
