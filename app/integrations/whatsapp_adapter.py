@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import re
+import subprocess
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -106,22 +108,43 @@ class WhatsAppAdapter:
             summary="WhatsApp adapter guardo contexto tras send_message",
             payload={"client_key": client_key, "channel": "whatsapp", "context": updated_context, "action": "send_message"},
         )
-        delivery_payload = self._send_via_whatsapp_api(client_key=client_key, text=message.text, trace_task_id=trace_task.id)
-        self._emit_task_event(
-            task_id=trace_task.id,
-            event_type="whatsapp_send_message",
-            summary="WhatsApp adapter envio mensaje simulado",
-            payload={"client_key": client_key, "text": message.text, "result": delivery_payload},
-        )
-        return {
-            "success": True,
-            "channel": "whatsapp",
-            "client_key": client_key,
-            "message": message.text,
-            "trace_task_id": trace_task.id,
-            "payload": delivery_payload,
-            "context": updated_context,
-        }
+        try:
+            delivery_payload = self._send_via_whatsapp_api(client_key=client_key, text=message.text, trace_task_id=trace_task.id)
+            self._emit_task_event(
+                task_id=trace_task.id,
+                event_type="whatsapp_send_message",
+                summary="WhatsApp adapter envio mensaje",
+                payload={
+                    "client_key": client_key,
+                    "text": message.text,
+                    "success": True,
+                    "result": delivery_payload,
+                },
+            )
+            self._set_task_status(task=trace_task, status="done")
+            return {
+                "success": True,
+                "channel": "whatsapp",
+                "client_key": client_key,
+                "message": message.text,
+                "trace_task_id": trace_task.id,
+                "payload": delivery_payload,
+                "context": updated_context,
+            }
+        except Exception as exc:
+            self._emit_task_event(
+                task_id=trace_task.id,
+                event_type="whatsapp_send_message",
+                summary="WhatsApp adapter fallo al enviar mensaje",
+                payload={
+                    "client_key": client_key,
+                    "text": message.text,
+                    "success": False,
+                    "error": str(exc),
+                },
+            )
+            self._set_task_status(task=trace_task, status="failed")
+            raise
 
     def _send_via_whatsapp_api(self, *, client_key: str, text: str, trace_task_id: str) -> dict[str, Any]:
         if self.sandbox_mode:
@@ -133,21 +156,71 @@ class WhatsAppAdapter:
                 payload={"client_key": client_key, "text": text, "sandbox": True},
             )
             return payload
-        if self.api_client is None:
-            raise RuntimeError("whatsapp_api_client_required_when_sandbox_disabled")
-        response = self.api_client.post(
-            "/whatsapp/send",
-            json={"phone_number": client_key, "text": text},
+        if self.api_client is not None:
+            response = self.api_client.post(
+                "/whatsapp/send",
+                json={"phone_number": client_key, "text": text},
+            )
+            if response.status_code != 200:
+                raise RuntimeError(f"whatsapp_send_failed:{response.status_code}:{response.text}")
+            payload = response.json()
+            return payload if isinstance(payload, dict) else {"delivery": "real", "status": "sent"}
+        try:
+            gateway_url = (settings.openclaw_gateway_url or "http://127.0.0.1:18797").rstrip("/")
+            with httpx.Client(base_url=gateway_url, timeout=15.0) as client:
+                response = client.post(
+                    "/whatsapp/send",
+                    json={"phone_number": client_key, "text": text},
+                )
+            if response.status_code == 200:
+                payload = response.json()
+                return payload if isinstance(payload, dict) else {"delivery": "real", "status": "sent"}
+        except Exception:
+            # Fallback al CLI real de OpenClaw cuando el endpoint HTTP no esta disponible.
+            pass
+
+        completed = subprocess.run(
+            [
+                "openclaw",
+                "message",
+                "send",
+                "--channel",
+                "whatsapp",
+                "--account",
+                "default",
+                "--target",
+                client_key,
+                "--message",
+                text,
+                "--json",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
         )
-        if response.status_code != 200:
-            raise RuntimeError(f"whatsapp_send_failed:{response.status_code}:{response.text}")
-        payload = response.json()
-        return payload if isinstance(payload, dict) else {"delivery": "real", "status": "sent"}
+        if completed.returncode != 0:
+            output_tail = (completed.stderr or completed.stdout or "").strip()
+            raise RuntimeError(f"whatsapp_send_failed_cli:{output_tail}")
+        lines = [line.strip() for line in (completed.stdout or "").splitlines() if line.strip()]
+        if not lines:
+            return {"delivery": "real", "status": "sent", "transport": "openclaw-cli"}
+        for raw in reversed(lines):
+            if not raw.startswith("{"):
+                continue
+            try:
+                payload = json.loads(raw)
+                if isinstance(payload, dict):
+                    return payload
+            except Exception:
+                continue
+        return {"delivery": "real", "status": "sent", "transport": "openclaw-cli", "raw": lines[-1]}
 
     def _extract_client_key(self, phone_number: str) -> str:
         cleaned = (phone_number or "").strip()
         if not cleaned:
             raise ValueError("phone_number_required")
+        if not re.fullmatch(r"\+521\d{10}", cleaned):
+            raise ValueError("phone_number_invalid_format_expected_+521XXXXXXXXXX")
         return cleaned
 
     def _parse_allowed_numbers(self, raw_value: str) -> set[str]:
@@ -267,3 +340,9 @@ class WhatsAppAdapter:
         except Exception:
             self.session.rollback()
             raise
+
+    def _set_task_status(self, *, task: Task, status: str) -> None:
+        task.status = status
+        task.updated_at = datetime.now(UTC)
+        self.session.add(task)
+        self.session.commit()

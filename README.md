@@ -18,6 +18,7 @@ Sistema operativo de coordinación para la IA personal de Gus: tareas, decisione
 - [Guía de Uso Rápida](#guía-de-uso-rápida)
 - [Demo Visual](#demo-visual)
 - [Validadores por Canal](#validadores-por-canal)
+- [Pruebas Live WhatsApp](#pruebas-live-whatsapp)
 - [Narrativa y Bitácora](#narrativa-y-bitácora)
 - [Semana 1 Ready Pack](#semana-1-ready-pack)
 - [Arranque Consolidado](#arranque-consolidado)
@@ -222,11 +223,16 @@ PLANE_PG_PASSWORD=plane
 PLANE_PG_DBNAME=plane
 PLANE_SYNC_PULL_LABEL=metiche:task
 
-WHATSAPP_ALLOWED_NUMBERS=+52TU_NUMERO_1,+52TU_NUMERO_2
+WHATSAPP_ALLOWED_NUMBERS=+521XXXXXXXXXX,+521YYYYYYYYYY
 WHATSAPP_SANDBOX_MODE=true
 TELEGRAM_ALLOWED_IDS=123456789,987654321
 TELEGRAM_SANDBOX_MODE=true
 ```
+
+Regla de formato WhatsApp:
+
+- Todos los celulares deben comenzar con `+521` y tener 10 dígitos después.
+- Ejemplo válido: `+5210000000000`.
 
 Variables de Semana 4 (hardening de canales):
 
@@ -292,6 +298,60 @@ Mientras tanto, puedes validar el flujo completo con los comandos de la sección
 | Shopify | Implementado | Ping a `shop.json` de Admin API | `SHOPIFY_STORE_DOMAIN` o `SHOPIFY_STORE_URL`, `SHOPIFY_ACCESS_TOKEN`, `SHOPIFY_API_VERSION` |
 | Dashboard | Implementado | Health endpoint directo o por puerto local | `DASHBOARD_HEALTH_URL` o `DASHBOARD_PORT` |
 | DeepSeek | Implementado | Validación básica de disponibilidad por credenciales/base URL | `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL` |
+
+## Pruebas Live WhatsApp
+
+Esta sección documenta el flujo real (sin sandbox) validado en el hito de pre-release.
+
+### Modo real obligatorio (sandbox desactivado)
+
+Para pruebas live, `WHATSAPP_SANDBOX_MODE` debe estar en `false` en el proceso que envía:
+
+- En Docker (`app` y `worker`): ya está forzado en `docker-compose.yml`.
+- En ejecución host (`uvicorn`): exportar la variable antes de iniciar API.
+
+Configuración mínima recomendada:
+
+```bash
+export OPENCLAW_GATEWAY_URL=http://127.0.0.1:18797
+export WHATSAPP_SANDBOX_MODE=false
+export WHATSAPP_ALLOWED_NUMBERS=+5210000000000,+5210000000000
+export OPENCLAW_GATEWAY_TOKEN=<token_gateway_openclaw>
+```
+
+### Formato de número obligatorio
+
+- Usar siempre formato `+521` + 10 dígitos.
+- Ejemplo válido: `+5210000000000`.
+
+### Smoke tests live
+
+Smoke con app embebida (TestClient):
+
+```bash
+PYTHONPATH=. ./.venv/bin/python scripts/whatsapp_real_smoke.py
+```
+
+Smoke contra API viva (`:8091`):
+
+```bash
+METICHE_API_BASE_URL=http://127.0.0.1:8091 \
+WHATSAPP_REAL_TARGET=+5210000000000 \
+PYTHONPATH=. ./.venv/bin/python scripts/whatsapp_real_smoke_live.py
+```
+
+### Evidencia esperada de éxito
+
+- Evento `whatsapp_send_message` con `payload.success=true`.
+- `payload.result.delivery=real` y `payload.result.status=sent`.
+- Memoria de canal actualizada con `last_outbound_message`.
+- Tarea de traza en War Room cerrada en `done` (no debe quedarse en `running`).
+
+### Troubleshooting rápido
+
+- Si el dashboard muestra tareas viejas en `running`, revisar `task_events` y normalizar estados (`done`/`failed`) según evento final.
+- Si hay éxito en evento pero no llega al celular, validar listener activo en OpenClaw y sesión vinculada de WhatsApp Web.
+- Si aparece `gateway url override requires explicit credentials`, cargar `OPENCLAW_GATEWAY_TOKEN` explícitamente.
 
 ### Cómo añadir un nuevo validador
 

@@ -15,6 +15,9 @@ services:
       DATABASE_URL: sqlite:////app/data/db/metiche_os.db
       OPENCLAW_READONLY_ROOT: /mnt/openclaw-ro
       PROJECTIONS_ROOT: /app/projections
+      OPENCLAW_GATEWAY_URL: http://host.docker.internal:18797
+      WHATSAPP_SANDBOX_MODE: "false"
+      WHATSAPP_ALLOWED_NUMBERS: +5210000000000,+5210000000000
     volumes:
       - ./:/app
       - /Users/gusluna/.openclaw:/mnt/openclaw-ro:ro
@@ -33,6 +36,9 @@ services:
       DATABASE_URL: sqlite:////app/data/db/metiche_os.db
       OPENCLAW_READONLY_ROOT: /mnt/openclaw-ro
       PROJECTIONS_ROOT: /app/projections
+      OPENCLAW_GATEWAY_URL: http://host.docker.internal:18797
+      WHATSAPP_SANDBOX_MODE: "false"
+      WHATSAPP_ALLOWED_NUMBERS: +5210000000000,+5210000000000
     volumes:
       - ./:/app
       - /Users/gusluna/.openclaw:/mnt/openclaw-ro:ro
