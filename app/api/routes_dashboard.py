@@ -8,6 +8,7 @@ from sqlmodel import Session
 
 from app.core.db import get_session
 from app.services.dashboard_service import (
+    cleanup_terminal_tasks,
     get_channel_events,
     get_channels_status,
     get_dashboard_stats,
@@ -105,6 +106,11 @@ def run_dashboard_task_route(payload: QuickTaskRequest, session: Session = Depen
         description=payload.description,
         launch_swarm=payload.launch_swarm,
     )
+
+
+@router.post("/tasks/cleanup-terminal")
+def cleanup_dashboard_terminal_tasks_route(session: Session = Depends(get_session)) -> dict:
+    return cleanup_terminal_tasks(session)
 
 
 @router.post("/tasks/{task_id}/action")
