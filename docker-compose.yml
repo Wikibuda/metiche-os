@@ -7,20 +7,25 @@ services:
       dockerfile: docker/app.Dockerfile
     container_name: metiche-os-app
     working_dir: /app
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8091 --reload
+    command: /bin/sh -lc "python /app/scripts/bootstrap_openclaw_state.py && exec uvicorn app.main:app --host 0.0.0.0 --port 8091 --reload"
     ports:
       - "8091:8091"
     environment:
       METICHE_ENV: development
       DATABASE_URL: sqlite:////app/data/db/metiche_os.db
       OPENCLAW_READONLY_ROOT: /mnt/openclaw-ro
+      OPENCLAW_CONFIG_PATH: /mnt/openclaw-state/openclaw.json
+      OPENCLAW_STATE_DIR: /mnt/openclaw-state
       PROJECTIONS_ROOT: /app/projections
-      OPENCLAW_GATEWAY_URL: http://host.docker.internal:18797
+      OPENCLAW_GATEWAY_URL: ${OPENCLAW_GATEWAY_URL:-http://host.docker.internal:18797}
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
+      OPENCLAW_ALLOW_INSECURE_PRIVATE_WS: ${OPENCLAW_ALLOW_INSECURE_PRIVATE_WS:-1}
       WHATSAPP_SANDBOX_MODE: "false"
-      WHATSAPP_ALLOWED_NUMBERS: +5210000000000,+5210000000001
+      WHATSAPP_ALLOWED_NUMBERS: ${WHATSAPP_ALLOWED_NUMBERS:-+5210000000000,+5210000000001}
     volumes:
       - ./:/app
       - /Users/gusluna/.openclaw:/mnt/openclaw-ro:ro
+      - openclaw_state:/mnt/openclaw-state
       - ./data:/app/data
       - ./projections:/app/projections
 
@@ -30,17 +35,25 @@ services:
       dockerfile: docker/app.Dockerfile
     container_name: metiche-os-worker
     working_dir: /app
-    command: python -m app.cli.main run-worker
+    command: /bin/sh -lc "python /app/scripts/bootstrap_openclaw_state.py && exec python -m app.cli.main run-worker"
     environment:
       METICHE_ENV: development
       DATABASE_URL: sqlite:////app/data/db/metiche_os.db
       OPENCLAW_READONLY_ROOT: /mnt/openclaw-ro
+      OPENCLAW_CONFIG_PATH: /mnt/openclaw-state/openclaw.json
+      OPENCLAW_STATE_DIR: /mnt/openclaw-state
       PROJECTIONS_ROOT: /app/projections
-      OPENCLAW_GATEWAY_URL: http://host.docker.internal:18797
+      OPENCLAW_GATEWAY_URL: ${OPENCLAW_GATEWAY_URL:-http://host.docker.internal:18797}
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
+      OPENCLAW_ALLOW_INSECURE_PRIVATE_WS: ${OPENCLAW_ALLOW_INSECURE_PRIVATE_WS:-1}
       WHATSAPP_SANDBOX_MODE: "false"
-      WHATSAPP_ALLOWED_NUMBERS: +5210000000000,+5210000000001
+      WHATSAPP_ALLOWED_NUMBERS: ${WHATSAPP_ALLOWED_NUMBERS:-+5210000000000,+5210000000001}
     volumes:
       - ./:/app
       - /Users/gusluna/.openclaw:/mnt/openclaw-ro:ro
+      - openclaw_state:/mnt/openclaw-state
       - ./data:/app/data
       - ./projections:/app/projections
+
+volumes:
+  openclaw_state:
