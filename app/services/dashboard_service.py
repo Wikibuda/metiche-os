@@ -611,6 +611,51 @@ def run_quick_task(session: Session, *, channel: str, title: str, description: s
     return flow.model_dump()
 
 
+def cleanup_terminal_tasks(session: Session) -> dict[str, Any]:
+    tasks = session.exec(select(Task)).all()
+    target_ids = [task.id for task in tasks if map_task_status(task.status) in {"done", "failed"}]
+    if not target_ids:
+        return {"ok": True, "deleted_count": 0, "deleted_task_ids": []}
+
+    existing_tables = {
+        str(row._mapping.get("name"))
+        for row in session.connection().execute(
+            text("SELECT name FROM sqlite_master WHERE type = 'table'")
+        ).fetchall()
+        if row._mapping.get("name")
+    }
+
+    task_scoped_tables = (
+        "task_events",
+        "validation",
+        "execution",
+        "decision",
+        "enginedispatch",
+        "routeresolution",
+        "queueentry",
+        "plane_sync",
+    )
+
+    for start in range(0, len(target_ids), 200):
+        chunk = target_ids[start : start + 200]
+        params = {f"task_id_{idx}": value for idx, value in enumerate(chunk)}
+        placeholders = ", ".join(f":task_id_{idx}" for idx in range(len(chunk)))
+        for table in task_scoped_tables:
+            if table not in existing_tables:
+                continue
+            session.connection().execute(
+                text(f"DELETE FROM {table} WHERE task_id IN ({placeholders})"),
+                params,
+            )
+        session.connection().execute(
+            text(f"DELETE FROM task WHERE id IN ({placeholders})"),
+            params,
+        )
+
+    session.commit()
+    return {"ok": True, "deleted_count": len(target_ids), "deleted_task_ids": target_ids}
+
+
 def perform_task_action(session: Session, *, task_id: str, action: str, priority: str | None = None) -> dict[str, Any]:
     task = session.get(Task, task_id)
     if not task:
