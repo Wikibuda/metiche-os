@@ -16,6 +16,8 @@ venv/
 
 # Local databases
 *.db
+**/*.db
+data/db/metiche_os.db
 # Sensitive local state and credentials (never commit)
 credentials/
 browser/

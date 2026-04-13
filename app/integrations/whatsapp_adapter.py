@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
+from pathlib import Path
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -87,28 +89,29 @@ class WhatsAppAdapter:
     def send_message(self, message: OutboundWhatsAppMessage) -> dict[str, Any]:
         client_key = self._extract_client_key(message.client_key)
         trace_task = self._create_trace_task(client_key=client_key, message_text=message.text, direction="outbound")
-        self._validate_safelist(client_key=client_key, trace_task_id=trace_task.id, direction="outbound")
-
-        loaded_context = self._get_context_from_api(client_key=client_key)
-        self._emit_task_event(
-            task_id=trace_task.id,
-            event_type="whatsapp_memory_read",
-            summary="WhatsApp adapter recupero contexto antes de send_message",
-            payload={"client_key": client_key, "channel": "whatsapp", "context": loaded_context, "action": "send_message"},
-        )
-
-        updated_context = dict(loaded_context)
-        updated_context["last_outbound_message"] = message.text
-        updated_context["last_channel"] = "whatsapp"
-        updated_context["updated_at"] = datetime.now(UTC).isoformat()
-        self._save_context_to_api(client_key=client_key, context=updated_context)
-        self._emit_task_event(
-            task_id=trace_task.id,
-            event_type="whatsapp_memory_write",
-            summary="WhatsApp adapter guardo contexto tras send_message",
-            payload={"client_key": client_key, "channel": "whatsapp", "context": updated_context, "action": "send_message"},
-        )
         try:
+            self._validate_safelist(client_key=client_key, trace_task_id=trace_task.id, direction="outbound")
+
+            loaded_context = self._get_context_from_api(client_key=client_key)
+            self._emit_task_event(
+                task_id=trace_task.id,
+                event_type="whatsapp_memory_read",
+                summary="WhatsApp adapter recupero contexto antes de send_message",
+                payload={"client_key": client_key, "channel": "whatsapp", "context": loaded_context, "action": "send_message"},
+            )
+
+            updated_context = dict(loaded_context)
+            updated_context["last_outbound_message"] = message.text
+            updated_context["last_channel"] = "whatsapp"
+            updated_context["updated_at"] = datetime.now(UTC).isoformat()
+            self._save_context_to_api(client_key=client_key, context=updated_context)
+            self._emit_task_event(
+                task_id=trace_task.id,
+                event_type="whatsapp_memory_write",
+                summary="WhatsApp adapter guardo contexto tras send_message",
+                payload={"client_key": client_key, "channel": "whatsapp", "context": updated_context, "action": "send_message"},
+            )
+
             delivery_payload = self._send_via_whatsapp_api(client_key=client_key, text=message.text, trace_task_id=trace_task.id)
             self._emit_task_event(
                 task_id=trace_task.id,
@@ -179,9 +182,27 @@ class WhatsAppAdapter:
             # Fallback al CLI real de OpenClaw cuando el endpoint HTTP no esta disponible.
             pass
 
+        cli_path = self._resolve_openclaw_cli()
+        cli_env = dict(os.environ)
+        if "/" in cli_path:
+            cli_dir = str(Path(cli_path).parent)
+            cli_env["PATH"] = f"{cli_dir}:{cli_env.get('PATH', '')}"
+        config_path = (settings.openclaw_config_path or "").strip()
+        if config_path:
+            cli_env["OPENCLAW_CONFIG_PATH"] = config_path
+        state_dir = (settings.openclaw_state_dir or "").strip()
+        if state_dir:
+            cli_env["OPENCLAW_STATE_DIR"] = state_dir
+        gateway_url = (settings.openclaw_gateway_url or "").strip()
+        if gateway_url:
+            cli_env["OPENCLAW_GATEWAY_URL"] = gateway_url
+        gateway_token = (getattr(settings, "openclaw_gateway_token", "") or "").strip()
+        if gateway_token:
+            cli_env["OPENCLAW_GATEWAY_TOKEN"] = gateway_token
+
         completed = subprocess.run(
             [
-                "openclaw",
+                cli_path,
                 "message",
                 "send",
                 "--channel",
@@ -196,12 +217,15 @@ class WhatsAppAdapter:
             ],
             check=False,
             capture_output=True,
-            text=True,
+            text=False,
+            env=cli_env,
         )
+        stdout_text = (completed.stdout or b"").decode("utf-8", errors="replace")
+        stderr_text = (completed.stderr or b"").decode("utf-8", errors="replace")
         if completed.returncode != 0:
-            output_tail = (completed.stderr or completed.stdout or "").strip()
+            output_tail = (stderr_text or stdout_text or "").strip()
             raise RuntimeError(f"whatsapp_send_failed_cli:{output_tail}")
-        lines = [line.strip() for line in (completed.stdout or "").splitlines() if line.strip()]
+        lines = [line.strip() for line in stdout_text.splitlines() if line.strip()]
         if not lines:
             return {"delivery": "real", "status": "sent", "transport": "openclaw-cli"}
         for raw in reversed(lines):
@@ -214,6 +238,17 @@ class WhatsAppAdapter:
             except Exception:
                 continue
         return {"delivery": "real", "status": "sent", "transport": "openclaw-cli", "raw": lines[-1]}
+
+    def _resolve_openclaw_cli(self) -> str:
+        explicit = (getattr(settings, "openclaw_cli_path", "") or "").strip()
+        if explicit and Path(explicit).exists():
+            return explicit
+        if Path("/mnt/nvm/versions/node").exists():
+            matches = sorted(Path("/mnt/nvm/versions/node").glob("*/bin/openclaw"))
+            for candidate in reversed(matches):
+                if candidate.exists():
+                    return str(candidate)
+        return "openclaw"
 
     def _extract_client_key(self, phone_number: str) -> str:
         cleaned = (phone_number or "").strip()

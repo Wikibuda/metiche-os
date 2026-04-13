@@ -395,6 +395,11 @@
 
       <aside class="panel">
         <h2>Detalle de Tarea</h2>
+        <div style="display:flex; justify-content:flex-end; margin-bottom:8px;">
+          <button id="detail-cleanup-terminal" class="secondary" style="width:auto; font-size:11px; padding:6px 8px;">
+            Limpiar done/failed
+          </button>
+        </div>
         <div id="detail-empty" class="small">Selecciona una tarjeta para ver timeline, payload y validación.</div>
         <div id="detail-view" style="display:none;">
           <div class="detail-box"><strong id="detail-title">-</strong><div class="small" id="detail-meta">-</div></div>
@@ -574,14 +579,15 @@
       const grouped = tasksResponse.grouped || {};
       ["queued", "running", "retrying", "failed", "done"].forEach((status) => {
         const host = qs(`col-${status}`);
-        const items = grouped[status] || [];
+        const allItems = grouped[status] || [];
+        const items = status === "done" ? allItems.slice(0, 5) : allItems;
         if (!items.length) {
           host.innerHTML = '<div class="small">Sin tareas</div>';
           return;
         }
         host.innerHTML = items.map(renderTaskCard).join("");
       });
-      qs("board-meta").textContent = `Total filtrado: ${tasksResponse.total} · Refresco cada ${state.refreshMs / 1000}s`;
+      qs("board-meta").textContent = `Total filtrado: ${tasksResponse.total} · DONE visible: 5 · Refresco cada ${state.refreshMs / 1000}s`;
       bindTaskCardEvents();
     }
 
@@ -823,6 +829,13 @@
       return grouped;
     }
 
+    function clearSelectedTaskDetail() {
+      state.selectedTaskId = null;
+      state.selectedTaskDetail = null;
+      qs("detail-empty").style.display = "block";
+      qs("detail-view").style.display = "none";
+    }
+
     function renderDetail(detail) {
       qs("detail-empty").style.display = "none";
       qs("detail-view").style.display = "block";
@@ -866,6 +879,30 @@
       } catch (error) {
         console.error("Error acción tarea:", error);
         openModal("Error", String(error.message || error));
+      }
+    }
+
+    async function cleanupTerminalTasks() {
+      const confirmed = window.confirm("¿Eliminar todas las tareas done/failed y su historial asociado?");
+      if (!confirmed) return;
+      const btn = qs("detail-cleanup-terminal");
+      const previousLabel = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = "Limpiando...";
+      try {
+        const result = await postJson("/dashboard/tasks/cleanup-terminal", {});
+        const deletedIds = Array.isArray(result.deleted_task_ids) ? result.deleted_task_ids : [];
+        if (state.selectedTaskId && deletedIds.includes(state.selectedTaskId)) {
+          clearSelectedTaskDetail();
+        }
+        await refreshAll();
+        openModal("Limpieza completada", `Se eliminaron ${result.deleted_count || 0} tareas terminales.`);
+      } catch (error) {
+        console.error("Error limpiando tareas terminales:", error);
+        openModal("Error", String(error.message || error));
+      } finally {
+        btn.disabled = false;
+        btn.textContent = previousLabel;
       }
     }
 
@@ -948,6 +985,8 @@
             const detail = await fetchJson(`/dashboard/tasks/${encodeURIComponent(state.selectedTaskId)}`);
             state.selectedTaskDetail = detail;
             renderDetail(detail);
+          } else {
+            clearSelectedTaskDetail();
           }
         }
       } catch (error) {
@@ -985,6 +1024,7 @@
         if (!state.selectedTaskId) return;
         await runTaskAction(state.selectedTaskId, "set_priority", qs("detail-priority").value);
       });
+      qs("detail-cleanup-terminal").addEventListener("click", cleanupTerminalTasks);
       qs("theme-dark").addEventListener("click", () => applyTheme("dark"));
       qs("theme-light").addEventListener("click", () => applyTheme("light"));
       qs("cfg-apply").addEventListener("click", () => {
