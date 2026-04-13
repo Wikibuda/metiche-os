@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:////app/data/db/metiche_os.db"
     openclaw_readonly_root: str = "/mnt/openclaw-ro"
     openclaw_gateway_url: str = "http://127.0.0.1:18797"
+    openclaw_gateway_token: str = ""
+    openclaw_cli_path: str = ""
+    openclaw_config_path: str = ""
+    openclaw_state_dir: str = "/mnt/openclaw-state"
     projections_root: str = "/app/projections"
     plane_sync_enabled: bool = True
     narrator_enabled: bool = True

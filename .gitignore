@@ -16,3 +16,5 @@ venv/
 
 # Local databases
 *.db
+**/*.db
+data/db/metiche_os.db
