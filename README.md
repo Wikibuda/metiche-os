@@ -593,7 +593,18 @@ PYTHONPATH=. ./.venv/bin/python scripts/telegram_adapter_smoke.py
 PYTHONPATH=. ./.venv/bin/python scripts/channels_dashboard_smoke.py
 PYTHONPATH=. ./.venv/bin/python scripts/swarm_whatsapp_e2e_smoke.py
 PYTHONPATH=. ./.venv/bin/python scripts/swarm_multichannel_e2e_smoke.py
+PYTHONPATH=. ./.venv/bin/python scripts/operational_validation.py
 ```
+
+`scripts/operational_validation.py` ejecuta una validación operacional automatizada para readiness de v1.0.0:
+
+- Inbound WhatsApp (`/webhooks/openclaw/whatsapp`) + evento `whatsapp_message_received` + memoria.
+- Outbound simulado + evento `whatsapp_send_message`.
+- Conversación de dos turnos para validar recuperación de contexto.
+- Endpoints de dashboard de canales (`/dashboard/channels/status` y `/dashboard/channels/events`).
+- Resiliencia con falla temporal mockeada del webhook.
+
+Nota: ejecutar con entorno Python del proyecto (3.11+), por ejemplo `./.venv/bin/python scripts/operational_validation.py`.
 
 ### War Room operativo
 
