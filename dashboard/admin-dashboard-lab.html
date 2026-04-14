@@ -344,6 +344,10 @@
             border-collapse: collapse;
             width: 100%;
         }
+        .recent-table-wrap {
+            max-height: 460px; /* ~7 filas visibles antes de scroll */
+            overflow-y: auto;
+        }
 
         th, td {
             border-bottom: 1px solid rgba(148, 163, 184, 0.14);
@@ -699,23 +703,25 @@
                 <input class="input" id="task-id-input" placeholder="Pega task_id para ver detalle" />
                 <button class="btn" id="load-task-detail" type="button">Ver detalle</button>
             </div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Título</th>
-                        <th>Tipo</th>
-                        <th>Modo</th>
-                        <th>Estado</th>
-                        <th>Actualización</th>
-                    </tr>
-                </thead>
-                <tbody id="recent-rows">
-                    <tr>
-                        <td colspan="6">Cargando tareas…</td>
-                    </tr>
-                </tbody>
-            </table>
+            <div class="recent-table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Título</th>
+                            <th>Tipo</th>
+                            <th>Modo</th>
+                            <th>Estado</th>
+                            <th>Actualización</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recent-rows">
+                        <tr>
+                            <td colspan="6">Cargando tareas…</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </section>
 
         <section class="panel" id="swarm-launch-panel">

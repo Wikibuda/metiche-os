@@ -12,6 +12,7 @@ from app.api.routes_rules import router as rules_router
 from app.api.routes_soul import router as soul_router
 from app.api.routes_swarm import router as swarm_router
 from app.api.routes_tasks import router as tasks_router
+from app.api.routes_webhooks import router as webhooks_router
 from app.bootstrap.seed_core import seed_core_data
 from app.core.db import create_db_and_tables
 
@@ -33,6 +34,7 @@ app.include_router(memory_router)
 app.include_router(rules_router)
 app.include_router(dashboard_router)
 app.include_router(swarm_router)
+app.include_router(webhooks_router)
 
 
 @app.get("/admin-dashboard.html", include_in_schema=False)

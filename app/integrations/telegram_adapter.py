@@ -54,33 +54,37 @@ class TelegramAdapter:
         client_key = self._extract_client_key(message.chat_id)
         trace_task = self._create_trace_task(client_key=client_key, message_text=message.text)
         self._validate_safelist(client_key=client_key, trace_task_id=trace_task.id, direction="inbound")
-
-        loaded_context = self._get_context_from_api(client_key=client_key)
-        self._emit_task_event(
-            task_id=trace_task.id,
-            event_type="telegram_memory_read",
-            summary="Telegram adapter recupero contexto desde memoria compartida",
-            payload={"client_key": client_key, "channel": "telegram", "context": loaded_context},
-        )
-        prompt = self._build_prompt(context=loaded_context, user_message=message.text)
-        updated_context = dict(loaded_context)
-        updated_context["last_user_message"] = message.text
-        updated_context["last_channel"] = "telegram"
-        updated_context["updated_at"] = datetime.now(UTC).isoformat()
-        self._save_context_to_api(client_key=client_key, context=updated_context)
-        self._emit_task_event(
-            task_id=trace_task.id,
-            event_type="telegram_memory_write",
-            summary="Telegram adapter guardo contexto en memoria compartida",
-            payload={"client_key": client_key, "channel": "telegram", "context": updated_context},
-        )
-        return TelegramAdapterResult(
-            client_key=client_key,
-            loaded_context=loaded_context,
-            updated_context=updated_context,
-            prompt=prompt,
-            trace_task_id=trace_task.id,
-        )
+        try:
+            loaded_context = self._get_context_from_api(client_key=client_key)
+            self._emit_task_event(
+                task_id=trace_task.id,
+                event_type="telegram_memory_read",
+                summary="Telegram adapter recupero contexto desde memoria compartida",
+                payload={"client_key": client_key, "channel": "telegram", "context": loaded_context},
+            )
+            prompt = self._build_prompt(context=loaded_context, user_message=message.text)
+            updated_context = dict(loaded_context)
+            updated_context["last_user_message"] = message.text
+            updated_context["last_channel"] = "telegram"
+            updated_context["updated_at"] = datetime.now(UTC).isoformat()
+            self._save_context_to_api(client_key=client_key, context=updated_context)
+            self._emit_task_event(
+                task_id=trace_task.id,
+                event_type="telegram_memory_write",
+                summary="Telegram adapter guardo contexto en memoria compartida",
+                payload={"client_key": client_key, "channel": "telegram", "context": updated_context},
+            )
+            self._set_task_status(task=trace_task, status="done")
+            return TelegramAdapterResult(
+                client_key=client_key,
+                loaded_context=loaded_context,
+                updated_context=updated_context,
+                prompt=prompt,
+                trace_task_id=trace_task.id,
+            )
+        except Exception:
+            self._set_task_status(task=trace_task, status="failed")
+            raise
 
     def send_message(self, message: OutboundTelegramMessage) -> dict[str, Any]:
         client_key = self._extract_client_key(message.client_key)
@@ -106,22 +110,33 @@ class TelegramAdapter:
             summary="Telegram adapter guardo contexto tras send_message",
             payload={"client_key": client_key, "channel": "telegram", "context": updated_context, "action": "send_message"},
         )
-        delivery_payload = self._send_via_telegram_api(client_key=client_key, text=message.text, trace_task_id=trace_task.id)
-        self._emit_task_event(
-            task_id=trace_task.id,
-            event_type="telegram_send_message",
-            summary="Telegram adapter envio mensaje",
-            payload={"client_key": client_key, "text": message.text, "result": delivery_payload},
-        )
-        return {
-            "success": True,
-            "channel": "telegram",
-            "client_key": client_key,
-            "message": message.text,
-            "trace_task_id": trace_task.id,
-            "payload": delivery_payload,
-            "context": updated_context,
-        }
+        try:
+            delivery_payload = self._send_via_telegram_api(client_key=client_key, text=message.text, trace_task_id=trace_task.id)
+            self._emit_task_event(
+                task_id=trace_task.id,
+                event_type="telegram_send_message",
+                summary="Telegram adapter envio mensaje",
+                payload={"client_key": client_key, "text": message.text, "success": True, "result": delivery_payload},
+            )
+            self._set_task_status(task=trace_task, status="done")
+            return {
+                "success": True,
+                "channel": "telegram",
+                "client_key": client_key,
+                "message": message.text,
+                "trace_task_id": trace_task.id,
+                "payload": delivery_payload,
+                "context": updated_context,
+            }
+        except Exception as exc:
+            self._emit_task_event(
+                task_id=trace_task.id,
+                event_type="telegram_send_message",
+                summary="Telegram adapter fallo al enviar mensaje",
+                payload={"client_key": client_key, "text": message.text, "success": False, "error": str(exc)},
+            )
+            self._set_task_status(task=trace_task, status="failed")
+            raise
 
     def _send_via_telegram_api(self, *, client_key: str, text: str, trace_task_id: str) -> dict[str, Any]:
         if self.sandbox_mode:
@@ -133,16 +148,28 @@ class TelegramAdapter:
                 payload={"client_key": client_key, "text": text, "sandbox": True},
             )
             return payload
-        if self.api_client is None:
-            raise RuntimeError("telegram_api_client_required_when_sandbox_disabled")
-        response = self.api_client.post(
-            "/telegram/send",
-            json={"chat_id": client_key, "text": text},
-        )
+        if self.api_client is not None:
+            response = self.api_client.post(
+                "/telegram/send",
+                json={"chat_id": client_key, "text": text},
+            )
+            if response.status_code != 200:
+                raise RuntimeError(f"telegram_send_failed:{response.status_code}:{response.text}")
+            payload = response.json()
+            return payload if isinstance(payload, dict) else {"delivery": "real", "status": "sent"}
+        if not settings.telegram_bot_token:
+            raise RuntimeError("telegram_bot_token_required_when_sandbox_disabled")
+        url = f"https://api.telegram.org/bot{settings.telegram_bot_token}/sendMessage"
+        with httpx.Client(timeout=15.0) as client:
+            response = client.post(url, json={"chat_id": client_key, "text": text})
         if response.status_code != 200:
             raise RuntimeError(f"telegram_send_failed:{response.status_code}:{response.text}")
         payload = response.json()
-        return payload if isinstance(payload, dict) else {"delivery": "real", "status": "sent"}
+        if not isinstance(payload, dict):
+            return {"delivery": "real", "status": "sent"}
+        if not bool(payload.get("ok")):
+            raise RuntimeError(f"telegram_send_failed:{payload}")
+        return payload
 
     def _extract_client_key(self, chat_id: str) -> str:
         cleaned = (chat_id or "").strip()
@@ -269,3 +296,9 @@ class TelegramAdapter:
         except Exception:
             self.session.rollback()
             raise
+
+    def _set_task_status(self, *, task: Task, status: str) -> None:
+        task.status = status
+        task.updated_at = datetime.now(UTC)
+        self.session.add(task)
+        self.session.commit()

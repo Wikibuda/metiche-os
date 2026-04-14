@@ -119,6 +119,11 @@
     }
     .col { background: var(--panel-soft); border: 1px solid var(--border); border-radius: 10px; padding: 8px; min-height: 220px; }
     .col h3 { font-size: 12px; margin: 0 0 8px 0; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .task-list {
+      max-height: 560px; /* ~7 tarjetas visibles antes de activar scroll */
+      overflow-y: auto;
+      padding-right: 4px;
+    }
     .task-card {
       background: var(--panel);
       border: 1px solid var(--border);
@@ -376,11 +381,11 @@
         </div>
         <div class="small" id="board-meta">Cargando...</div>
         <div class="board">
-          <div class="col"><h3>queued</h3><div id="col-queued"></div></div>
-          <div class="col"><h3>running</h3><div id="col-running"></div></div>
-          <div class="col"><h3>retrying</h3><div id="col-retrying"></div></div>
-          <div class="col"><h3>failed</h3><div id="col-failed"></div></div>
-          <div class="col"><h3>done</h3><div id="col-done"></div></div>
+          <div class="col"><h3>queued</h3><div id="col-queued" class="task-list"></div></div>
+          <div class="col"><h3>running</h3><div id="col-running" class="task-list"></div></div>
+          <div class="col"><h3>retrying</h3><div id="col-retrying" class="task-list"></div></div>
+          <div class="col"><h3>failed</h3><div id="col-failed" class="task-list"></div></div>
+          <div class="col"><h3>done</h3><div id="col-done" class="task-list"></div></div>
         </div>
         <div class="chronicles">
           <h2>Últimas Crónicas</h2>
@@ -395,11 +400,6 @@
 
       <aside class="panel">
         <h2>Detalle de Tarea</h2>
-        <div style="display:flex; justify-content:flex-end; margin-bottom:8px;">
-          <button id="detail-cleanup-terminal" class="secondary" style="width:auto; font-size:11px; padding:6px 8px;">
-            Limpiar done/failed
-          </button>
-        </div>
         <div id="detail-empty" class="small">Selecciona una tarjeta para ver timeline, payload y validación.</div>
         <div id="detail-view" style="display:none;">
           <div class="detail-box"><strong id="detail-title">-</strong><div class="small" id="detail-meta">-</div></div>
@@ -579,15 +579,14 @@
       const grouped = tasksResponse.grouped || {};
       ["queued", "running", "retrying", "failed", "done"].forEach((status) => {
         const host = qs(`col-${status}`);
-        const allItems = grouped[status] || [];
-        const items = status === "done" ? allItems.slice(0, 5) : allItems;
+        const items = grouped[status] || [];
         if (!items.length) {
           host.innerHTML = '<div class="small">Sin tareas</div>';
           return;
         }
         host.innerHTML = items.map(renderTaskCard).join("");
       });
-      qs("board-meta").textContent = `Total filtrado: ${tasksResponse.total} · DONE visible: 5 · Refresco cada ${state.refreshMs / 1000}s`;
+      qs("board-meta").textContent = `Total filtrado: ${tasksResponse.total} · 7 visibles por columna (con scroll) · Refresco cada ${state.refreshMs / 1000}s`;
       bindTaskCardEvents();
     }
 
@@ -882,30 +881,6 @@
       }
     }
 
-    async function cleanupTerminalTasks() {
-      const confirmed = window.confirm("¿Eliminar todas las tareas done/failed y su historial asociado?");
-      if (!confirmed) return;
-      const btn = qs("detail-cleanup-terminal");
-      const previousLabel = btn.textContent;
-      btn.disabled = true;
-      btn.textContent = "Limpiando...";
-      try {
-        const result = await postJson("/dashboard/tasks/cleanup-terminal", {});
-        const deletedIds = Array.isArray(result.deleted_task_ids) ? result.deleted_task_ids : [];
-        if (state.selectedTaskId && deletedIds.includes(state.selectedTaskId)) {
-          clearSelectedTaskDetail();
-        }
-        await refreshAll();
-        openModal("Limpieza completada", `Se eliminaron ${result.deleted_count || 0} tareas terminales.`);
-      } catch (error) {
-        console.error("Error limpiando tareas terminales:", error);
-        openModal("Error", String(error.message || error));
-      } finally {
-        btn.disabled = false;
-        btn.textContent = previousLabel;
-      }
-    }
-
     async function runQuickTask() {
       const title = qs("quick-title").value.trim();
       if (!title) {
@@ -1024,7 +999,6 @@
         if (!state.selectedTaskId) return;
         await runTaskAction(state.selectedTaskId, "set_priority", qs("detail-priority").value);
       });
-      qs("detail-cleanup-terminal").addEventListener("click", cleanupTerminalTasks);
       qs("theme-dark").addEventListener("click", () => applyTheme("dark"));
       qs("theme-light").addEventListener("click", () => applyTheme("light"));
       qs("cfg-apply").addEventListener("click", () => {

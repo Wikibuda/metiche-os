@@ -8,7 +8,6 @@ from sqlmodel import Session
 
 from app.core.db import get_session
 from app.services.dashboard_service import (
-    cleanup_terminal_tasks,
     get_channel_events,
     get_channels_status,
     get_dashboard_stats,
@@ -108,11 +107,6 @@ def run_dashboard_task_route(payload: QuickTaskRequest, session: Session = Depen
     )
 
 
-@router.post("/tasks/cleanup-terminal")
-def cleanup_dashboard_terminal_tasks_route(session: Session = Depends(get_session)) -> dict:
-    return cleanup_terminal_tasks(session)
-
-
 @router.post("/tasks/{task_id}/action")
 def dashboard_task_action_route(task_id: str, payload: TaskActionRequest, session: Session = Depends(get_session)) -> dict:
     try:
@@ -142,7 +136,7 @@ def get_dashboard_recent_narratives_route(
 @router.get("/channels/status")
 def get_dashboard_channels_status_route(
     event_preview_limit: int = Query(default=5, ge=1, le=10),
-    inactivity_minutes: int = Query(default=60, ge=1, le=1440),
+    inactivity_minutes: int = Query(default=1440, ge=1, le=1440),
     session: Session = Depends(get_session),
 ) -> dict:
     return get_channels_status(

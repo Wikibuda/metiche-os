@@ -57,34 +57,38 @@ class WhatsAppAdapter:
     def handle_incoming_message(self, message: IncomingWhatsAppMessage) -> WhatsAppAdapterResult:
         client_key = self._extract_client_key(message.phone_number)
         trace_task = self._create_trace_task(client_key=client_key, message_text=message.text)
-        self._validate_safelist(client_key=client_key, trace_task_id=trace_task.id, direction="inbound")
-
-        loaded_context = self._get_context_from_api(client_key=client_key)
-        self._emit_task_event(
-            task_id=trace_task.id,
-            event_type="whatsapp_memory_read",
-            summary="WhatsApp adapter recupero contexto desde memoria compartida",
-            payload={"client_key": client_key, "channel": "whatsapp", "context": loaded_context},
-        )
-        prompt = self._build_prompt(context=loaded_context, user_message=message.text)
-        updated_context = dict(loaded_context)
-        updated_context["last_user_message"] = message.text
-        updated_context["last_channel"] = "whatsapp"
-        updated_context["updated_at"] = datetime.now(UTC).isoformat()
-        self._save_context_to_api(client_key=client_key, context=updated_context)
-        self._emit_task_event(
-            task_id=trace_task.id,
-            event_type="whatsapp_memory_write",
-            summary="WhatsApp adapter guardo contexto en memoria compartida",
-            payload={"client_key": client_key, "channel": "whatsapp", "context": updated_context},
-        )
-        return WhatsAppAdapterResult(
-            client_key=client_key,
-            loaded_context=loaded_context,
-            updated_context=updated_context,
-            prompt=prompt,
-            trace_task_id=trace_task.id,
-        )
+        try:
+            self._validate_safelist(client_key=client_key, trace_task_id=trace_task.id, direction="inbound")
+            loaded_context = self._get_context_from_api(client_key=client_key)
+            self._emit_task_event(
+                task_id=trace_task.id,
+                event_type="whatsapp_memory_read",
+                summary="WhatsApp adapter recupero contexto desde memoria compartida",
+                payload={"client_key": client_key, "channel": "whatsapp", "context": loaded_context},
+            )
+            prompt = self._build_prompt(context=loaded_context, user_message=message.text)
+            updated_context = dict(loaded_context)
+            updated_context["last_user_message"] = message.text
+            updated_context["last_channel"] = "whatsapp"
+            updated_context["updated_at"] = datetime.now(UTC).isoformat()
+            self._save_context_to_api(client_key=client_key, context=updated_context)
+            self._emit_task_event(
+                task_id=trace_task.id,
+                event_type="whatsapp_memory_write",
+                summary="WhatsApp adapter guardo contexto en memoria compartida",
+                payload={"client_key": client_key, "channel": "whatsapp", "context": updated_context},
+            )
+            self._set_task_status(task=trace_task, status="done")
+            return WhatsAppAdapterResult(
+                client_key=client_key,
+                loaded_context=loaded_context,
+                updated_context=updated_context,
+                prompt=prompt,
+                trace_task_id=trace_task.id,
+            )
+        except Exception:
+            self._set_task_status(task=trace_task, status="failed")
+            raise
 
     def send_message(self, message: OutboundWhatsAppMessage) -> dict[str, Any]:
         client_key = self._extract_client_key(message.client_key)
