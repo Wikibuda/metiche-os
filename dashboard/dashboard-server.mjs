@@ -18,6 +18,7 @@ const PROD_LOG = path.join(OPENCLAW_ROOT, "logs", "gateway.log");
 const PROD_ERR_LOG = path.join(OPENCLAW_ROOT, "logs", "gateway.err.log");
 const PORT = Number(process.env.DASHBOARD_PORT || 5063);
 const METICHE_OS_BASE = process.env.METICHE_OS_BASE || "http://127.0.0.1:8091";
+const METICHE_TIMEOUT_MS = Number(process.env.METICHE_TIMEOUT_MS || 4500);
 
 // Archivos de datos para dashboards
 const SHOPIFY_SALES_FILE = path.join(OPENCLAW_ROOT, "workspace", "dashboard_parts", "shopify_today_simple.json");
@@ -418,21 +419,29 @@ async function readTail(filePath, maxLines = 60) {
 }
 
 async function fetchJson(url) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), METICHE_TIMEOUT_MS);
   try {
     const response = await fetch(url, {
-      headers: { Accept: "application/json" }
+      headers: { Accept: "application/json" },
+      signal: controller.signal
     });
     if (!response.ok) return null;
     return await response.json();
   } catch {
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
 async function fetchJsonDetailed(url) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), METICHE_TIMEOUT_MS);
   try {
     const response = await fetch(url, {
-      headers: { Accept: "application/json" }
+      headers: { Accept: "application/json" },
+      signal: controller.signal
     });
     const contentType = response.headers.get("content-type") || "";
     let payload = null;
@@ -455,15 +464,20 @@ async function fetchJsonDetailed(url) {
       data: null,
       error: error.message
     };
+  } finally {
+    clearTimeout(timer);
   }
 }
 
 async function postJsonDetailed(url, payload = null) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), METICHE_TIMEOUT_MS);
   try {
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: payload === null ? null : JSON.stringify(payload)
+      body: payload === null ? null : JSON.stringify(payload),
+      signal: controller.signal
     });
     const contentType = response.headers.get("content-type") || "";
     let data = null;
@@ -486,6 +500,8 @@ async function postJsonDetailed(url, payload = null) {
       data: null,
       error: error.message
     };
+  } finally {
+    clearTimeout(timer);
   }
 }
 

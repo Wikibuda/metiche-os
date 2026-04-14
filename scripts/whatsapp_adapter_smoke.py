@@ -21,7 +21,7 @@ def main() -> None:
     from app.main import app
 
     client_key = "+5210000000000"
-    unauthorized_number = "+521234567890"
+    unauthorized_number = "+5212345678901"
     seed_context = {"customer_name": "Ada", "last_topic": "pedido retrasado", "step": 2}
 
     with TestClient(app) as client:
