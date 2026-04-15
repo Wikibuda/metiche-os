@@ -11,6 +11,7 @@ from app.services.dashboard_service import (
     get_channel_events,
     get_channels_status,
     get_dashboard_stats,
+    get_plane_issues_section,
     get_whatsapp_conversations,
     get_recent_narratives_block,
     get_task_detail,
@@ -159,6 +160,14 @@ def get_dashboard_channel_events_route(
         if str(exc) == "unsupported_channel":
             raise HTTPException(status_code=400, detail="Canal no soportado") from exc
         raise
+
+
+@router.get("/plane/issues")
+def get_dashboard_plane_issues_route(
+    limit: int = Query(default=30, ge=1, le=200),
+    session: Session = Depends(get_session),
+) -> dict:
+    return get_plane_issues_section(session, limit=limit)
 
 
 @router.get("/conversations")

@@ -31,6 +31,9 @@ services:
       - openclaw_state:/mnt/openclaw-state
       - ./data:/app/data
       - ./projections:/app/projections
+    networks:
+      - default
+      - plane_selfhost
 
   worker:
     build:
@@ -60,6 +63,14 @@ services:
       - openclaw_state:/mnt/openclaw-state
       - ./data:/app/data
       - ./projections:/app/projections
+    networks:
+      - default
+      - plane_selfhost
 
 volumes:
   openclaw_state:
+
+networks:
+  plane_selfhost:
+    external: true
+    name: plane-selfhost_default

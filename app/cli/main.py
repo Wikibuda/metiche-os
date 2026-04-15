@@ -21,6 +21,7 @@ from app.domain.narrative.narrator_selector import MinimalNarratorSelector
 from app.domain.tasks.models import TaskRunCreate
 from app.domain.tasks.service import process_next_task, run_task_flow
 from app.projections.bitacora import build_bitacora
+from app.services.plane_bridge_service import process_plane_enjambre_pull
 
 cli = typer.Typer(no_args_is_help=True)
 register_validation_commands(cli)
@@ -88,9 +89,23 @@ def run_worker() -> None:
     create_db_and_tables()
     seed_core_data()
     selector = MinimalNarratorSelector()
+    last_plane_watch_at = 0.0
     while True:
         with Session(engine) as session:
             result = process_next_task(session)
+            now_ts = time.time()
+            if (
+                settings.plane_sync_enabled
+                and settings.plane_watch_enabled
+                and now_ts - last_plane_watch_at >= max(5, settings.plane_watch_interval_seconds)
+            ):
+                pull_result = process_plane_enjambre_pull(session, limit=settings.plane_watch_limit)
+                if pull_result.get("ok") and pull_result.get("launched"):
+                    typer.echo(
+                        "plane-watch lanzó enjambres: "
+                        f"launched={pull_result.get('launched')} scanned={pull_result.get('scanned')}"
+                    )
+                last_plane_watch_at = now_ts
             selected = selector.tick(session)
             promoted = selector.promote_pending_candidates(session, limit=50)
             build_bitacora(session, Path(settings.projections_root) / "bitacora" / "bitacora_de_asombros.md")
