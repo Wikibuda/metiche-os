@@ -9,6 +9,7 @@ from sqlmodel import Session, select
 from app.domain.narrative.service import list_recent_narratives
 from app.domain.tasks.models import QueueEntry, Task, Validation
 from app.domain.tasks.service import build_operational_overview, derive_queue_bucket, normalize_priority, run_task_flow
+from app.services.channel_memory_service import ChannelMemoryService
 
 BOARD_STATUSES = ("queued", "running", "retrying", "failed", "done")
 VALIDATOR_CHANNELS = ("telegram", "whatsapp", "shopify", "dashboard", "deepseek")
@@ -165,6 +166,55 @@ def _load_channel_events(session: Session, *, channel: str, limit: int) -> list[
     except Exception:
         return []
     return [dict(row._mapping) for row in rows]
+
+
+def _load_whatsapp_conversation_events(session: Session, *, limit: int) -> list[dict[str, Any]]:
+    safe_limit = max(1, min(limit, 5000))
+    try:
+        rows = session.connection().execute(
+            text(
+                """
+                SELECT id, task_id, event_type, event_summary, payload_json, occurred_at
+                FROM task_events
+                WHERE event_type IN ('whatsapp_message_received', 'whatsapp_message_sent')
+                ORDER BY occurred_at DESC
+                LIMIT :limit
+                """
+            ),
+            {"limit": safe_limit},
+        ).fetchall()
+    except Exception:
+        return []
+    return [dict(row._mapping) for row in rows]
+
+
+def _extract_client_key_from_event_payload(payload: dict[str, Any]) -> str | None:
+    direct = (payload.get("client_key") or payload.get("phone_number") or "").strip()
+    if direct:
+        return direct
+    for key in ("message", "data", "event", "payload"):
+        nested = payload.get(key)
+        if isinstance(nested, dict):
+            candidate = (nested.get("client_key") or nested.get("phone_number") or nested.get("to") or "").strip()
+            if candidate:
+                return candidate
+    return None
+
+
+def _extract_message_text_from_event_payload(payload: dict[str, Any]) -> str | None:
+    direct = (payload.get("text") or payload.get("content") or payload.get("body") or "").strip()
+    if direct:
+        return direct
+    message = payload.get("message")
+    if isinstance(message, str):
+        value = message.strip()
+        if value:
+            return value
+    if isinstance(message, dict):
+        nested = (message.get("text") or message.get("body") or message.get("content") or "").strip()
+        if nested:
+            return nested
+    return None
 
 
 def _load_latest_event(session: Session) -> datetime | None:
@@ -547,6 +597,82 @@ def get_channel_events(session: Session, *, channel: str, limit: int = 10) -> di
         "limit": max(1, min(limit, 100)),
         "total": len(items),
         "items": items,
+    }
+
+
+def get_whatsapp_conversations(
+    session: Session,
+    *,
+    q: str | None = None,
+    limit_clients: int = 20,
+    limit_messages_per_client: int = 40,
+) -> dict[str, Any]:
+    safe_limit_clients = max(1, min(limit_clients, 100))
+    safe_limit_messages = max(1, min(limit_messages_per_client, 200))
+    scan_limit = max(300, safe_limit_clients * safe_limit_messages * 4)
+    rows = _load_whatsapp_conversation_events(session, limit=scan_limit)
+
+    parsed_events: list[dict[str, Any]] = []
+    for row in rows:
+        payload = _safe_json(row.get("payload_json"))
+        client_key = _extract_client_key_from_event_payload(payload)
+        if not client_key:
+            continue
+        message_text = _extract_message_text_from_event_payload(payload) or ""
+        event_type = str(row.get("event_type") or "")
+        direction = "inbound" if event_type == "whatsapp_message_received" else "outbound"
+        parsed_events.append(
+            {
+                "id": row.get("id"),
+                "task_id": row.get("task_id"),
+                "client_key": client_key,
+                "event_type": event_type,
+                "direction": direction,
+                "text": message_text,
+                "summary": row.get("event_summary"),
+                "occurred_at": row.get("occurred_at"),
+                "payload": payload,
+            }
+        )
+
+    parsed_events.sort(key=lambda item: _coerce_datetime(item.get("occurred_at")) or datetime.min)
+
+    query = (q or "").strip().lower()
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for item in parsed_events:
+        if query:
+            hit_client = query in str(item.get("client_key") or "").lower()
+            hit_text = query in str(item.get("text") or "").lower()
+            if not (hit_client or hit_text):
+                continue
+        grouped.setdefault(item["client_key"], []).append(item)
+
+    memory_service = ChannelMemoryService(session)
+    conversations: list[dict[str, Any]] = []
+    for client_key, items in grouped.items():
+        recent_items = items[-safe_limit_messages:]
+        latest_ts = _coerce_datetime(recent_items[-1].get("occurred_at")) if recent_items else None
+        context = memory_service.get_context(client_key=client_key, channel="whatsapp") or {}
+        conversations.append(
+            {
+                "client_key": client_key,
+                "last_event_at": latest_ts,
+                "message_count": len(recent_items),
+                "messages": recent_items,
+                "context": context,
+            }
+        )
+
+    conversations.sort(key=lambda item: item.get("last_event_at") or datetime.min, reverse=True)
+    limited = conversations[:safe_limit_clients]
+    total_messages = sum(int(item.get("message_count") or 0) for item in limited)
+
+    return {
+        "generated_at": datetime.utcnow(),
+        "q": q or "",
+        "total_clients": len(limited),
+        "total_messages": total_messages,
+        "items": limited,
     }
 
 
