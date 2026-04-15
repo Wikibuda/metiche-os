@@ -10,6 +10,7 @@ from app.domain.narrative.service import list_recent_narratives
 from app.domain.tasks.models import QueueEntry, Task, Validation
 from app.domain.tasks.service import build_operational_overview, derive_queue_bucket, normalize_priority, run_task_flow
 from app.services.channel_memory_service import ChannelMemoryService
+from app.services.plane_bridge_service import list_plane_related_issues
 
 BOARD_STATUSES = ("queued", "running", "retrying", "failed", "done")
 VALIDATOR_CHANNELS = ("telegram", "whatsapp", "shopify", "dashboard", "deepseek")
@@ -718,6 +719,15 @@ def get_channels_status(session: Session, *, event_preview_limit: int = 5, inact
     return {
         "generated_at": now,
         "channels": channels,
+    }
+
+
+def get_plane_issues_section(session: Session, *, limit: int = 30) -> dict[str, Any]:
+    items = list_plane_related_issues(session, limit=limit)
+    return {
+        "generated_at": datetime.utcnow(),
+        "total": len(items),
+        "items": items,
     }
 
 

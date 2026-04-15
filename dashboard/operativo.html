@@ -238,6 +238,22 @@
       color: var(--muted);
       margin-bottom: 3px;
     }
+    .plane-section { margin-top: 12px; }
+    .plane-item {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px;
+      margin-bottom: 8px;
+      background: var(--panel-soft);
+      font-size: 12px;
+    }
+    .plane-item .head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
     .event-badge {
       border-radius: 999px;
       font-size: 11px;
@@ -446,6 +462,11 @@
           <div class="small" id="conv-meta">Cargando conversaciones...</div>
           <div id="conv-list"></div>
         </div>
+        <div class="plane-section">
+          <h2>Issues Plane Relacionados</h2>
+          <div class="small" id="plane-meta">Cargando issues de Plane...</div>
+          <div id="plane-list"></div>
+        </div>
         <div class="memory-section">
           <h2>Memoria Reciente</h2>
           <div id="memory-stats" class="memory-stats">Cargando estadísticas...</div>
@@ -538,6 +559,7 @@
       retryingThreshold: 2,
       blockingThreshold: 3,
       conversations: [],
+      planeIssues: [],
       timer: null
     };
 
@@ -834,6 +856,47 @@
       });
     }
 
+    function renderPlaneIssues(response) {
+      const host = qs("plane-list");
+      const items = response?.items || [];
+      qs("plane-meta").textContent = `Issues relacionados: ${response?.total || 0}`;
+      if (!items.length) {
+        host.innerHTML = '<div class="small">Sin issues relacionados por ahora.</div>';
+        return;
+      }
+      host.innerHTML = items.map((item) => {
+        const issueId = escapeHtml(item.issue_id || "-");
+        const syncStatus = escapeHtml(item.sync_status || "-");
+        const stateLabel = escapeHtml(item.issue_state || "-");
+        const taskRef = item.task_id
+          ? `${escapeHtml(item.task_title || "(sin título)")} · ${escapeHtml(item.task_id)}`
+          : "Sin tarea local vinculada";
+        const labels = Array.isArray(item.labels) && item.labels.length ? item.labels.join(", ") : "-";
+        const issueUrl = item.issue_url ? String(item.issue_url) : "";
+        const openBtn = issueUrl
+          ? `<button class="secondary" data-plane-url="${escapeHtml(issueUrl)}" style="width:auto;">Abrir</button>`
+          : `<span class="small">Sin URL</span>`;
+        return `
+          <div class="plane-item">
+            <div class="head">
+              <div><strong>${issueId}</strong></div>
+              ${openBtn}
+            </div>
+            <div class="small">sync: ${syncStatus} · state: ${stateLabel}</div>
+            <div class="small">labels: ${escapeHtml(labels)}</div>
+            <div class="small">task: ${taskRef}</div>
+            <div class="small">último sync: ${fmtDate(item.last_synced_at)} · swarm: ${escapeHtml(item.last_swarm_id || "-")}</div>
+          </div>
+        `;
+      }).join("");
+      host.querySelectorAll("[data-plane-url]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const raw = btn.getAttribute("data-plane-url") || "";
+          if (raw) window.open(raw, "_blank");
+        });
+      });
+    }
+
     async function refreshMemory(force = false) {
       const now = Date.now();
       if (!force && now - state.lastMemoryRefreshAt < state.memoryRefreshMs) return;
@@ -1070,11 +1133,12 @@
       const statsUrl = `/dashboard/stats?retrying_threshold_minutes=${state.retryingThreshold}&blocking_threshold=${state.blockingThreshold}`;
       const tasksUrl = `/dashboard/tasks?${query}`;
       try {
-        const [stats, tasksResp, validatorsResp, narrativesResp, conversationsResp] = await Promise.all([
+        const [stats, tasksResp, validatorsResp, narrativesResp, planeIssuesResp, conversationsResp] = await Promise.all([
           fetchJson(statsUrl),
           fetchJson(tasksUrl),
           fetchJson("/dashboard/validators"),
           fetchJson("/dashboard/recent-narratives?limit=8"),
+          fetchJson("/dashboard/plane/issues?limit=40"),
           (() => {
             const params = new URLSearchParams();
             const query = qs("conv-search").value.trim();
@@ -1091,6 +1155,8 @@
         renderValidators(validatorsResp);
         renderChronicles(narrativesResp);
         renderConversations(conversationsResp);
+        state.planeIssues = planeIssuesResp.items || [];
+        renderPlaneIssues(planeIssuesResp);
         await refreshMemory(false);
         if (state.selectedTaskId) {
           const stillExists = state.tasks.find((item) => item.task_id === state.selectedTaskId);

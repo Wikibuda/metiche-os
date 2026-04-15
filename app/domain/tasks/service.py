@@ -8,10 +8,10 @@ from sqlmodel import Session, select
 
 from app.core.config import settings
 from app.domain.validators import DashboardValidator, DeepseekValidator, ShopifyValidator, TelegramValidator, ValidationResult, WhatsAppValidator
-from app.integrations.plane import comment_on_issue, create_issue
 from app.domain.narrative.models import NarrativeEntryCreate
 from app.domain.narrative.service import create_narrative_entry
 from app.domain.tasks.models import Decision, DecisionRead, EngineDispatch, EngineDispatchRead, EscalationRead, Execution, ExecutionRead, OperationalOverviewRead, QueueEntry, QueueEntryRead, RouteResolution, RouteResolutionRead, Task, TaskCreate, TaskEnqueueCreate, TaskFlowRead, TaskQueueProcessRead, TaskRead, TaskRunCreate, Validation, ValidationRead
+from app.services.plane_bridge_service import sync_task_status_to_plane
 
 
 def create_task(session: Session, payload: TaskCreate) -> TaskRead:
@@ -534,7 +534,6 @@ def _validate_execution(session: Session, task: Task, execution: Execution) -> d
 
     all_passed = all(item.passed for item in results)
     notes = "; ".join([f"{item.channel}={'ok' if item.passed else 'fail'} ({item.detail})" for item in results])
-    _sync_plane_validation(task, results)
     return {"status": "passed" if all_passed else "failed", "notes": notes, "results": results}
 
 
@@ -547,22 +546,6 @@ def _resolve_validation_plan(session: Session, task: Task, validation_result: di
     if has_critical_failure:
         return "failed"
     return "retry" if failed_count < MAX_VALIDATION_RETRIES - 1 else "failed"
-
-
-def _sync_plane_validation(task: Task, results: list[ValidationResult]) -> None:
-    if not settings.plane_sync_enabled:
-        return
-    failed = [item for item in results if not item.passed]
-    if not failed:
-        return
-    description = "<br/>".join([f"<b>{item.channel}</b>: {item.detail}" for item in failed])
-    issue = create_issue(
-        title=f"[metiche] Validacion fallida: {task.title}",
-        description=f"Tarea: {task.id}<br/>Tipo: {task.task_type}<br/>{description}",
-        labels=["metiche", "validation-failed"],
-    )
-    if issue.ok and issue.data.get("id"):
-        comment_on_issue(issue.data["id"], f"Se registraron {len(failed)} canales fallidos en validacion automatica.")
 
 
 def _emit_task_event(
@@ -753,6 +736,22 @@ def execute_task_entity(session: Session, task: Task) -> tuple[TaskFlowRead, boo
     session.commit()
     session.refresh(validation)
     session.refresh(task)
+
+    failed_channels = [
+        item.channel
+        for item in validation_result.get("results", [])
+        if isinstance(item, ValidationResult) and not item.passed
+    ]
+    if validation_plan in {"failed", "passed"} and settings.plane_sync_enabled:
+        try:
+            sync_task_status_to_plane(
+                session,
+                task=task,
+                failed_channels=failed_channels if validation_plan == "failed" else [],
+            )
+        except Exception:
+            session.rollback()
+
     _emit_task_event(
         session,
         task=task,

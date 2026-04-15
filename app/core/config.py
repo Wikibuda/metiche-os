@@ -24,6 +24,15 @@ class Settings(BaseSettings):
     openclaw_state_dir: str = "/mnt/openclaw-state"
     projections_root: str = "/app/projections"
     plane_sync_enabled: bool = True
+    plane_use_direct_db: bool = False
+    plane_db_type: str = "postgres"
+    plane_pg_host: str = ""
+    plane_pg_port: int = 5432
+    plane_pg_user: str = ""
+    plane_pg_password: str = ""
+    plane_pg_dbname: str = ""
+    plane_sqlite_path: str = ""
+    plane_sync_pull_label: str = "run:enjambre"
     narrator_enabled: bool = True
     soul_enabled: bool = True
     worker_poll_seconds: int = 5
@@ -36,6 +45,9 @@ class Settings(BaseSettings):
     plane_api_url: str = ""
     plane_api_token: str = ""
     plane_timeout_seconds: int = 15
+    plane_watch_enabled: bool = True
+    plane_watch_interval_seconds: int = 20
+    plane_watch_limit: int = 20
 
     validation_timeout_seconds: int = 10
     validation_required_channels: str = ""
