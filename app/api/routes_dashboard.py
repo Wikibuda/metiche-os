@@ -11,6 +11,7 @@ from app.services.dashboard_service import (
     get_channel_events,
     get_channels_status,
     get_dashboard_stats,
+    get_whatsapp_conversations,
     get_recent_narratives_block,
     get_task_detail,
     get_validator_statuses,
@@ -158,3 +159,18 @@ def get_dashboard_channel_events_route(
         if str(exc) == "unsupported_channel":
             raise HTTPException(status_code=400, detail="Canal no soportado") from exc
         raise
+
+
+@router.get("/conversations")
+def get_dashboard_conversations_route(
+    q: str | None = Query(default=None, description="Busqueda por client_key o texto"),
+    limit_clients: int = Query(default=20, ge=1, le=100),
+    limit_messages: int = Query(default=40, ge=1, le=200),
+    session: Session = Depends(get_session),
+) -> dict:
+    return get_whatsapp_conversations(
+        session,
+        q=q,
+        limit_clients=limit_clients,
+        limit_messages_per_client=limit_messages,
+    )

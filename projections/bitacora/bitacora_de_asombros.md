@@ -11,11 +11,87 @@ _El libro vivo de Gus, Metiche y los enjambres._
 Evento: validation_attempt
 Importancia: low
 Asombro: 4
-Ocurrio: 2026-04-14 17:27:03.377223
+Ocurrio: 2026-04-14 21:48:39.975671
 Resumen: Canal whatsapp: passed
 Payload: {"channel": "whatsapp", "passed": true, "critical": false, "detail": "WhatsApp gateway live y canal linked/enabled.", "metadata": {"status": 200, "response": {"ok": true, "status": "live"}, "health_url": "http://host.docker.internal:1879...
 
 ## 🌅 Crónicas recientes
+
+### [validation_attempt] Canal whatsapp: passed
+**Narrador:** metiche
+**Tipo:** chronicle
+**Asombro:** 4
+
+Evento: validation_attempt
+Importancia: low
+Asombro: 4
+Ocurrio: 2026-04-14 21:48:39.975671
+Resumen: Canal whatsapp: passed
+Payload: {"channel": "whatsapp", "passed": true, "critical": false, "detail": "WhatsApp gateway live y canal linked/enabled.", "metadata": {"status": 200, "response": {"ok": true, "status": "live"}, "health_url": "http://host.docker.internal:1879...
+
+### Metiche movió la misión: WhatsApp inbound +5218122534338
+**Narrador:** metiche
+**Tipo:** chronicle
+**Asombro:** 4
+
+Metiche recibió la misión WhatsApp inbound +5218122534338 y la empujó por la ruta reasoner_whatsapp. La ejecución cerró con estado completed y la validación quedó en passed. Jefe, el laboratorio ya dejó memoria viva de este movimiento.
+
+### [validation_attempt] Canal whatsapp: passed
+**Narrador:** metiche
+**Tipo:** chronicle
+**Asombro:** 4
+
+Evento: validation_attempt
+Importancia: low
+Asombro: 4
+Ocurrio: 2026-04-14 20:55:58.544844
+Resumen: Canal whatsapp: passed
+Payload: {"channel": "whatsapp", "passed": true, "critical": false, "detail": "WhatsApp gateway live y canal linked/enabled.", "metadata": {"status": 200, "response": {"ok": true, "status": "live"}, "health_url": "http://host.docker.internal:1879...
+
+### Metiche movió la misión: WhatsApp inbound +5218118549040
+**Narrador:** metiche
+**Tipo:** chronicle
+**Asombro:** 4
+
+Metiche recibió la misión WhatsApp inbound +5218118549040 y la empujó por la ruta reasoner_whatsapp. La ejecución cerró con estado completed y la validación quedó en passed. Jefe, el laboratorio ya dejó memoria viva de este movimiento.
+
+### [validation_attempt] Canal whatsapp: passed
+**Narrador:** metiche
+**Tipo:** chronicle
+**Asombro:** 4
+
+Evento: validation_attempt
+Importancia: low
+Asombro: 4
+Ocurrio: 2026-04-14 20:55:53.398668
+Resumen: Canal whatsapp: passed
+Payload: {"channel": "whatsapp", "passed": true, "critical": false, "detail": "WhatsApp gateway live y canal linked/enabled.", "metadata": {"status": 200, "response": {"ok": true, "status": "live"}, "health_url": "http://host.docker.internal:1879...
+
+### Metiche movió la misión: WhatsApp inbound +5218118549040
+**Narrador:** metiche
+**Tipo:** chronicle
+**Asombro:** 4
+
+Metiche recibió la misión WhatsApp inbound +5218118549040 y la empujó por la ruta reasoner_whatsapp. La ejecución cerró con estado completed y la validación quedó en passed. Jefe, el laboratorio ya dejó memoria viva de este movimiento.
+
+### [validation_attempt] Canal whatsapp: passed
+**Narrador:** metiche
+**Tipo:** chronicle
+**Asombro:** 4
+
+Evento: validation_attempt
+Importancia: low
+Asombro: 4
+Ocurrio: 2026-04-14 20:55:17.850611
+Resumen: Canal whatsapp: passed
+Payload: {"channel": "whatsapp", "passed": true, "critical": false, "detail": "WhatsApp gateway live y canal linked/enabled.", "metadata": {"status": 200, "response": {"ok": true, "status": "live"}, "health_url": "http://host.docker.internal:1879...
+
+### Metiche movió la misión: WhatsApp inbound +5218118549040
+**Narrador:** metiche
+**Tipo:** chronicle
+**Asombro:** 4
+
+Metiche recibió la misión WhatsApp inbound +5218118549040 y la empujó por la ruta reasoner_whatsapp. La ejecución cerró con estado completed y la validación quedó en passed. Jefe, el laboratorio ya dejó memoria viva de este movimiento.
 
 ### [validation_attempt] Canal whatsapp: passed
 **Narrador:** metiche

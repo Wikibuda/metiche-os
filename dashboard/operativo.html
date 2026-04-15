@@ -192,6 +192,52 @@
       cursor: pointer;
       font-size: 12px;
     }
+    .conversation-section { margin-top: 12px; }
+    .conversation-controls { display: grid; grid-template-columns: 1fr 120px; gap: 8px; margin-bottom: 8px; }
+    .conversation-item {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px;
+      margin-bottom: 8px;
+      background: var(--panel-soft);
+    }
+    .conversation-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      font-size: 12px;
+    }
+    .conversation-messages {
+      max-height: 230px;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 6px;
+      margin-bottom: 8px;
+    }
+    .chat-line {
+      margin-bottom: 6px;
+      padding: 6px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-size: 12px;
+    }
+    .chat-in {
+      background: rgba(110, 168, 254, 0.12);
+      border-color: rgba(110, 168, 254, 0.45);
+    }
+    .chat-out {
+      background: rgba(45, 211, 111, 0.12);
+      border-color: rgba(45, 211, 111, 0.45);
+    }
+    .chat-meta {
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 3px;
+    }
     .event-badge {
       border-radius: 999px;
       font-size: 11px;
@@ -391,6 +437,15 @@
           <h2>Últimas Crónicas</h2>
           <div id="chronicles-list"></div>
         </div>
+        <div class="conversation-section">
+          <h2>Conversaciones WhatsApp (Masa Madre)</h2>
+          <div class="conversation-controls">
+            <input id="conv-search" placeholder="Buscar por client_key o texto" />
+            <button id="conv-search-btn" class="secondary">Buscar</button>
+          </div>
+          <div class="small" id="conv-meta">Cargando conversaciones...</div>
+          <div id="conv-list"></div>
+        </div>
         <div class="memory-section">
           <h2>Memoria Reciente</h2>
           <div id="memory-stats" class="memory-stats">Cargando estadísticas...</div>
@@ -482,6 +537,7 @@
       memoryFilterType: "",
       retryingThreshold: 2,
       blockingThreshold: 3,
+      conversations: [],
       timer: null
     };
 
@@ -499,6 +555,15 @@
 
     function qs(id) {
       return document.getElementById(id);
+    }
+
+    function escapeHtml(value) {
+      return String(value || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
     }
 
     function memoryApiBase() {
@@ -722,6 +787,53 @@
       });
     }
 
+    function renderConversations(response) {
+      const host = qs("conv-list");
+      const items = response?.items || [];
+      qs("conv-meta").textContent = `Clientes: ${response?.total_clients || 0} · Mensajes: ${response?.total_messages || 0}`;
+      if (!items.length) {
+        host.innerHTML = '<div class="small">Sin conversaciones para los filtros actuales.</div>';
+        return;
+      }
+      host.innerHTML = items.map((conv) => {
+        const messages = Array.isArray(conv.messages) ? conv.messages : [];
+        const lines = messages.map((msg) => {
+          const isInbound = msg.direction === "inbound";
+          const cls = isInbound ? "chat-in" : "chat-out";
+          const role = isInbound ? "Entrante" : "Saliente";
+          const eventType = msg.event_type || "-";
+          const text = escapeHtml(msg.text || "(sin texto)");
+          return `
+            <div class="chat-line ${cls}">
+              <div class="chat-meta">${role} · ${eventType} · ${fmtDate(msg.occurred_at)}</div>
+              <div>${text}</div>
+            </div>
+          `;
+        }).join("");
+        const safeClient = escapeHtml(conv.client_key || "-");
+        const contextPayload = JSON.stringify(conv.context || {}, null, 2);
+        return `
+          <div class="conversation-item">
+            <div class="conversation-head">
+              <div><strong>${safeClient}</strong></div>
+              <div class="small">${messages.length} evento(s) · ${fmtDate(conv.last_event_at)}</div>
+            </div>
+            <div class="conversation-messages">${lines || '<div class="small">Sin eventos.</div>'}</div>
+            <button class="secondary" data-conv-context="${safeClient}" style="width:auto;">Ver contexto memoria</button>
+            <pre style="display:none;" data-conv-context-payload="${safeClient}">${escapeHtml(contextPayload)}</pre>
+          </div>
+        `;
+      }).join("");
+      host.querySelectorAll("[data-conv-context]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const key = button.getAttribute("data-conv-context");
+          const payloadEl = host.querySelector(`[data-conv-context-payload="${CSS.escape(key)}"]`);
+          const payloadText = payloadEl ? payloadEl.textContent : "{}";
+          openModal(`Contexto ${key}`, payloadText);
+        });
+      });
+    }
+
     async function refreshMemory(force = false) {
       const now = Date.now();
       if (!force && now - state.lastMemoryRefreshAt < state.memoryRefreshMs) return;
@@ -744,6 +856,23 @@
         console.error("Error cargando memoria:", error);
         qs("memory-list").innerHTML = '<div class="small">No se pudo cargar memoria.</div>';
         qs("memory-stats").textContent = "Error consultando estadísticas de memoria.";
+      }
+    }
+
+    async function refreshConversations() {
+      const params = new URLSearchParams();
+      const query = qs("conv-search").value.trim();
+      if (query) params.set("q", query);
+      params.set("limit_clients", "20");
+      params.set("limit_messages", "60");
+      try {
+        const response = await fetchJson(`/dashboard/conversations?${params.toString()}`);
+        state.conversations = response.items || [];
+        renderConversations(response);
+      } catch (error) {
+        console.error("Error cargando conversaciones:", error);
+        qs("conv-meta").textContent = "No se pudieron cargar conversaciones.";
+        qs("conv-list").innerHTML = '<div class="small">Error consultando conversaciones.</div>';
       }
     }
 
@@ -941,11 +1070,19 @@
       const statsUrl = `/dashboard/stats?retrying_threshold_minutes=${state.retryingThreshold}&blocking_threshold=${state.blockingThreshold}`;
       const tasksUrl = `/dashboard/tasks?${query}`;
       try {
-        const [stats, tasksResp, validatorsResp, narrativesResp] = await Promise.all([
+        const [stats, tasksResp, validatorsResp, narrativesResp, conversationsResp] = await Promise.all([
           fetchJson(statsUrl),
           fetchJson(tasksUrl),
           fetchJson("/dashboard/validators"),
-          fetchJson("/dashboard/recent-narratives?limit=8")
+          fetchJson("/dashboard/recent-narratives?limit=8"),
+          (() => {
+            const params = new URLSearchParams();
+            const query = qs("conv-search").value.trim();
+            if (query) params.set("q", query);
+            params.set("limit_clients", "20");
+            params.set("limit_messages", "60");
+            return fetchJson(`/dashboard/conversations?${params.toString()}`);
+          })()
         ]);
         const latencyMs = Math.round(performance.now() - cycleStart);
         applyTopStats(stats, latencyMs);
@@ -953,6 +1090,7 @@
         renderBoard(tasksResp);
         renderValidators(validatorsResp);
         renderChronicles(narrativesResp);
+        renderConversations(conversationsResp);
         await refreshMemory(false);
         if (state.selectedTaskId) {
           const stillExists = state.tasks.find((item) => item.task_id === state.selectedTaskId);
@@ -986,6 +1124,13 @@
       });
       ["filter-channel", "filter-status", "filter-priority", "filter-task-id"].forEach((id) => {
         qs(id).addEventListener("input", refreshAll);
+      });
+      qs("conv-search-btn").addEventListener("click", refreshConversations);
+      qs("conv-search").addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          refreshConversations();
+        }
       });
       qs("detail-retry").addEventListener("click", async () => {
         if (!state.selectedTaskId) return;
