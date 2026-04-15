@@ -11,8 +11,11 @@ from sqlalchemy import text
 from sqlmodel import Session
 
 from app.core.db import get_session
+from app.core.config import settings
 from app.domain.tasks.models import Task
 from app.integrations.whatsapp_adapter import IncomingWhatsAppMessage, WhatsAppAdapter
+from app.services.channel_memory_service import ChannelMemoryService
+from app.services.whatsapp_event_recorder import record_whatsapp_outbound_event
 
 router = APIRouter(prefix="/webhooks/openclaw", tags=["webhooks"])
 
@@ -77,6 +80,48 @@ def _extract_inbound_fields(raw_payload: dict[str, Any]) -> tuple[str | None, st
     return phone_number, message_text
 
 
+def _extract_outbound_fields(raw_payload: dict[str, Any]) -> tuple[str | None, str | None, str | None]:
+    key_buckets: dict[str, list[str]] = {}
+    _collect_strings(
+        raw_payload,
+        keys={
+            "phone",
+            "phone_number",
+            "to",
+            "to_number",
+            "target",
+            "recipient",
+            "client_key",
+            "text",
+            "content",
+            "body",
+            "message",
+            "account",
+            "bot",
+            "bot_name",
+            "sender_name",
+            "sender",
+        },
+        out=key_buckets,
+    )
+
+    phone_candidates: list[str] = []
+    for key in ("client_key", "to", "to_number", "target", "recipient", "phone_number", "phone"):
+        phone_candidates.extend(key_buckets.get(key, []))
+    client_key = next((_normalize_phone(item) for item in phone_candidates if _normalize_phone(item)), None)
+
+    text_candidates: list[str] = []
+    for key in ("text", "content", "body", "message"):
+        text_candidates.extend(key_buckets.get(key, []))
+    message_text = next((item.strip() for item in text_candidates if item.strip()), None)
+
+    sender_candidates: list[str] = []
+    for key in ("account", "bot_name", "bot", "sender_name", "sender"):
+        sender_candidates.extend(key_buckets.get(key, []))
+    sender = next((item.strip() for item in sender_candidates if item.strip()), None)
+    return client_key, message_text, sender
+
+
 def _emit_event(session: Session, *, task_id: str, event_type: str, summary: str, payload: dict[str, Any]) -> None:
     now = datetime.now(UTC)
     session.connection().execute(
@@ -105,6 +150,40 @@ def _emit_event(session: Session, *, task_id: str, event_type: str, summary: str
         },
     )
     session.commit()
+
+
+def _append_conversation_message(
+    session: Session,
+    *,
+    client_key: str,
+    direction: str,
+    event_type: str,
+    text: str,
+    source: str,
+    trace_task_id: str | None,
+) -> dict[str, Any]:
+    memory_service = ChannelMemoryService(session)
+    previous_context = memory_service.get_context(client_key=client_key, channel="whatsapp") or {}
+    conversation = list(previous_context.get("conversation_history") or [])
+    now_iso = datetime.now(UTC).isoformat()
+    conversation.append(
+        {
+            "ts": now_iso,
+            "direction": direction,
+            "event_type": event_type,
+            "text": text,
+            "source": source,
+            "trace_task_id": trace_task_id,
+        }
+    )
+    updated_context = dict(previous_context)
+    updated_context["conversation_history"] = conversation[-120:]
+    updated_context["last_message_direction"] = direction
+    updated_context["last_message_text"] = text
+    updated_context["last_message_source"] = source
+    updated_context["updated_at"] = now_iso
+    memory_service.save_context(client_key=client_key, channel="whatsapp", context=updated_context)
+    return updated_context
 
 
 @router.post("/whatsapp")
@@ -146,6 +225,15 @@ def openclaw_whatsapp_webhook(payload: dict[str, Any], session: Session = Depend
             "raw_payload": merged_payload,
         },
     )
+    _append_conversation_message(
+        session,
+        client_key=result.client_key,
+        direction="inbound",
+        event_type="whatsapp_message_received",
+        text=message_text,
+        source="openclaw_webhook_inbound",
+        trace_task_id=result.trace_task_id,
+    )
 
     task = session.get(Task, result.trace_task_id)
     if task is not None and task.status == "running":
@@ -162,3 +250,29 @@ def openclaw_whatsapp_webhook(payload: dict[str, Any], session: Session = Depend
         "event_type": "whatsapp_message_received",
         "message_preview": message_text[:120],
     }
+
+
+@router.post("/whatsapp/outbound")
+def openclaw_whatsapp_outbound_webhook(payload: dict[str, Any], session: Session = Depends(get_session)) -> dict[str, Any]:
+    envelope = OpenClawWebhookPayload.model_validate(payload)
+
+    event_channel = (envelope.channel or "").strip().lower()
+    if event_channel and event_channel != "whatsapp":
+        raise HTTPException(status_code=400, detail="channel_not_supported")
+
+    merged_payload: dict[str, Any] = {}
+    for chunk in (payload, envelope.model_dump(exclude_none=True, by_alias=True), envelope.payload or {}, envelope.event or {}, envelope.data or {}):
+        if isinstance(chunk, dict):
+            merged_payload.update(chunk)
+
+    try:
+        return record_whatsapp_outbound_event(
+            session,
+            raw_payload=merged_payload,
+            source_label="openclaw_webhook_outbound",
+            default_sender_name=settings.openclaw_autoreply_sender_name,
+        )
+    except ValueError as exc:
+        if str(exc) == "missing_client_key_or_text":
+            raise HTTPException(status_code=400, detail="missing_client_key_or_text") from exc
+        raise

@@ -1,4 +1,5 @@
-from contextlib import asynccontextmanager
+import asyncio
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
@@ -14,14 +15,26 @@ from app.api.routes_swarm import router as swarm_router
 from app.api.routes_tasks import router as tasks_router
 from app.api.routes_webhooks import router as webhooks_router
 from app.bootstrap.seed_core import seed_core_data
+from app.core.config import settings
 from app.core.db import create_db_and_tables
+from app.services.openclaw_autoreply_poller import OpenClawAutoReplyPoller
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    poller_task: asyncio.Task[None] | None = None
     create_db_and_tables()
     seed_core_data()
-    yield
+    if settings.openclaw_autoreply_polling_enabled:
+        poller = OpenClawAutoReplyPoller()
+        poller_task = asyncio.create_task(poller.run_forever())
+    try:
+        yield
+    finally:
+        if poller_task is not None:
+            poller_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await poller_task
 
 
 app = FastAPI(title="metiche-os", version="0.1.0", lifespan=lifespan)

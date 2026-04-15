@@ -51,6 +51,21 @@ class Settings(BaseSettings):
     whatsapp_business_number: str = ""
     whatsapp_allowed_numbers: str = "+5210000000000,+5210000000001"
     whatsapp_sandbox_mode: bool = True
+    openclaw_autoreply_polling_enabled: bool = True
+    openclaw_autoreply_log_glob: str = "/mnt/openclaw-logs/openclaw-*.log"
+    openclaw_autoreply_poll_seconds: int = 3
+    openclaw_autoreply_state_path: str = "/app/data/openclaw-autoreply-state.json"
+    openclaw_autoreply_backfill_on_start: bool = False
+    openclaw_autoreply_sender_name: str = "Masa Madre"
+    openclaw_session_resolver_enabled: bool = True
+    openclaw_session_globs: str = (
+        "/mnt/openclaw-ro/agents/masa-madre/sessions/*.jsonl,"
+        "/mnt/openclaw-ro/agents/masa-madre/sessions-backup/*.jsonl,"
+        "/mnt/openclaw-ro/agents/masa-madre/sessions_backup/*.jsonl"
+    )
+    openclaw_session_resolver_max_files: int = 15
+    openclaw_session_resolver_max_lines_per_file: int = 600
+    openclaw_session_resolver_max_delta_seconds: int = 300
     dashboard_health_url: str = ""
     dashboard_health_token: str = ""
     dashboard_port: str = ""

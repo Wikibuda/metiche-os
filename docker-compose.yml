@@ -20,11 +20,14 @@ services:
       OPENCLAW_GATEWAY_URL: ${OPENCLAW_GATEWAY_URL:-http://host.docker.internal:18797}
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
       OPENCLAW_ALLOW_INSECURE_PRIVATE_WS: ${OPENCLAW_ALLOW_INSECURE_PRIVATE_WS:-1}
+      OPENCLAW_AUTOREPLY_LOG_GLOB: ${OPENCLAW_AUTOREPLY_LOG_GLOB:-/mnt/openclaw-logs/openclaw-*.log}
+      OPENCLAW_AUTOREPLY_STATE_PATH: ${OPENCLAW_AUTOREPLY_STATE_PATH:-/app/data/openclaw-autoreply-state.json}
       WHATSAPP_SANDBOX_MODE: "false"
-      WHATSAPP_ALLOWED_NUMBERS: ${WHATSAPP_ALLOWED_NUMBERS:-+5218142982923,+52115007309}
+      WHATSAPP_ALLOWED_NUMBERS: ${WHATSAPP_ALLOWED_NUMBERS-}
     volumes:
       - ./:/app
       - /Users/gusluna/.openclaw:/mnt/openclaw-ro:ro
+      - /tmp/openclaw:/mnt/openclaw-logs:ro
       - openclaw_state:/mnt/openclaw-state
       - ./data:/app/data
       - ./projections:/app/projections
@@ -46,11 +49,14 @@ services:
       OPENCLAW_GATEWAY_URL: ${OPENCLAW_GATEWAY_URL:-http://host.docker.internal:18797}
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
       OPENCLAW_ALLOW_INSECURE_PRIVATE_WS: ${OPENCLAW_ALLOW_INSECURE_PRIVATE_WS:-1}
+      OPENCLAW_AUTOREPLY_LOG_GLOB: ${OPENCLAW_AUTOREPLY_LOG_GLOB:-/mnt/openclaw-logs/openclaw-*.log}
+      OPENCLAW_AUTOREPLY_STATE_PATH: ${OPENCLAW_AUTOREPLY_STATE_PATH:-/app/data/openclaw-autoreply-state.json}
       WHATSAPP_SANDBOX_MODE: "false"
-      WHATSAPP_ALLOWED_NUMBERS: ${WHATSAPP_ALLOWED_NUMBERS:-+5218142982923,+52115007309}
+      WHATSAPP_ALLOWED_NUMBERS: ${WHATSAPP_ALLOWED_NUMBERS-}
     volumes:
       - ./:/app
       - /Users/gusluna/.openclaw:/mnt/openclaw-ro:ro
+      - /tmp/openclaw:/mnt/openclaw-logs:ro
       - openclaw_state:/mnt/openclaw-state
       - ./data:/app/data
       - ./projections:/app/projections

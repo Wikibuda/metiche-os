@@ -271,6 +271,9 @@ class WhatsAppAdapter:
         return numbers
 
     def _validate_safelist(self, *, client_key: str, trace_task_id: str, direction: str) -> None:
+        # Empty safelist means "allow all clients" for production rollout.
+        if not self.allowed_numbers:
+            return
         if client_key in self.allowed_numbers:
             return
         self._emit_task_event(
