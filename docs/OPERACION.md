@@ -22,7 +22,34 @@ Lectura rapida de secciones:
 - Estado de canales: salud y actividad reciente por WhatsApp/Telegram.
 - Enjambres: ciclos ejecutados, decision (`accept/reject`), objetivo y trazabilidad.
 
-## 2) Monitoreo de conversaciones
+## 2) Flujo de operacion diaria con decision
+
+```mermaid
+flowchart LR
+  A[Revisar dashboard] --> B[Validar canales]
+  B --> C[Revisar conversaciones]
+  C --> D{¿Incidentes?}
+  D -->|Si| E[Atender incidentes]
+  E --> F[Lanzar enjambre si aplica]
+  F --> G[Ver resultado en Plane]
+  G --> H[Actualizar bitacora y cierre]
+  D -->|No| I[Monitoreo pasivo / Fin]
+```
+
+La operacion diaria de Metiche-OS sigue un flujo simple pero efectivo:
+
+- Revisar el dashboard (`operativo.html` o `swarm-console.html`) para obtener una vision general del estado del sistema.
+- Validar los canales (WhatsApp, Plane, etc.) confirmando que estan verdes (operativos) y que no hay alertas criticas.
+- Revisar las conversaciones recientes (seccion "Conversaciones WhatsApp") para identificar consultas de clientes, incidentes o posibles fallos del bot "Masa Madre".
+- ¿Incidentes? Si no hay, el operador puede pasar a monitoreo pasivo. Si los hay, continuar al paso siguiente.
+- Atender incidentes (por ejemplo, responder al cliente, investigar errores en los logs, o escalar el problema).
+- Lanzar un enjambre si la solucion puede automatizarse (crear un issue en Plane con la etiqueta `run:enjambre`). El enjambre se ejecutara y actualizara el issue automaticamente.
+- Ver el resultado en Plane (comentarios, cambios de estado) para confirmar que el enjambre completo su tarea.
+- Actualizar la bitacora (con `metiche --momento`) y cerrar el incidente, dejando trazabilidad para futuras referencias.
+
+Este flujo garantiza que ninguna incidencia quede sin seguimiento y que el sistema aprenda de cada evento, alimentando la mejora continua.
+
+## 3) Monitoreo de conversaciones
 
 ### Buscar por cliente
 
@@ -50,7 +77,7 @@ Eventos frecuentes:
 - `whatsapp_message_sent`: salida registrada por webhook outbound.
 - `validation_attempt`: resultado de validacion de tarea/canal.
 
-## 3) Gestion de enjambres
+## 4) Gestion de enjambres
 
 ### Lanzar enjambre manual
 
@@ -86,7 +113,7 @@ curl -s http://127.0.0.1:8091/swarm | jq
 curl -s http://127.0.0.1:8091/swarm/<swarm_id>/history | jq
 ```
 
-## 4) Integracion con Plane (operacion)
+## 5) Integracion con Plane (operacion)
 
 ### Issue que lanza enjambre (`run:enjambre`)
 
@@ -109,7 +136,7 @@ Cuando el worker detecta el issue:
 curl -s "http://127.0.0.1:8091/dashboard/plane/issues?limit=30" | jq
 ```
 
-## 5) Resolucion de problemas comunes
+## 6) Resolucion de problemas comunes
 
 ### Caso A: el webhook no recibe mensajes
 
@@ -148,7 +175,7 @@ Acciones:
 - Rotar/truncar logs locales del dashboard (`data/dashboard-5063.log`).
 - Ajustar verbosidad y frecuencia de polling si aplica.
 
-## 6) Comandos utiles de operacion
+## 7) Comandos utiles de operacion
 
 ```bash
 # Estado general
@@ -173,7 +200,7 @@ PYTHONPATH=. python scripts/swarm_integration_smoke.py
 PYTHONPATH=. python scripts/whatsapp_adapter_smoke.py
 ```
 
-## 7) Referencias cruzadas
+## 8) Referencias cruzadas
 
 - [README](../README.md)
 - [Despliegue](DESPLIEGUE.md)
