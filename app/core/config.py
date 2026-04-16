@@ -48,6 +48,11 @@ class Settings(BaseSettings):
     plane_watch_enabled: bool = True
     plane_watch_interval_seconds: int = 20
     plane_watch_limit: int = 20
+    traje_iron_man_scheduler_enabled: bool = True
+    traje_iron_man_scheduler_poll_seconds: int = 60
+    traje_iron_man_default_lote: int = 20
+    traje_iron_man_state_path: str = "/app/data/traje-iron-man-state.json"
+    traje_iron_man_telegram_target: str = ""
 
     validation_timeout_seconds: int = 10
     validation_required_channels: str = ""

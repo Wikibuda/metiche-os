@@ -25,6 +25,7 @@ router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 _ROOT_DIR = Path(__file__).resolve().parents[2]
 _OPERATIVO_HTML = _ROOT_DIR / "dashboard" / "operativo.html"
 _ADMIN_DASHBOARD_HTML = _ROOT_DIR / "dashboard" / "admin-dashboard-lab.html"
+_TRAJE_IRON_MAN_HTML = _ROOT_DIR / "dashboard" / "traje_iron_man.html"
 
 
 class QuickTaskRequest(BaseModel):
@@ -54,6 +55,14 @@ def get_admin_dashboard_html() -> FileResponse:
     if not _ADMIN_DASHBOARD_HTML.exists():
         raise HTTPException(status_code=404, detail="dashboard/admin-dashboard-lab.html no existe")
     return FileResponse(_ADMIN_DASHBOARD_HTML)
+
+
+@router.get("/traje-iron-man")
+@router.get("/traje-iron-man.html")
+def get_traje_iron_man_html() -> FileResponse:
+    if not _TRAJE_IRON_MAN_HTML.exists():
+        raise HTTPException(status_code=404, detail="dashboard/traje_iron_man.html no existe")
+    return FileResponse(_TRAJE_IRON_MAN_HTML)
 
 
 @router.get("/stats")

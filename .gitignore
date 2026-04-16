@@ -18,3 +18,7 @@ venv/
 *.db
 **/*.db
 data/db/metiche_os.db
+
+# Operational artifacts (keep local only)
+projections/bitacora/bitacora_de_asombros.md
+data/openclaw-autoreply-state.json

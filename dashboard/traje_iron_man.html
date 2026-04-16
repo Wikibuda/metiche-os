@@ -1,0 +1,1368 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🦾 Dashboard Traje Iron Man - Metiche ➰</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #2563eb;
+            --secondary: #8b5cf6;
+            --accent: #f97316;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --dark: #1f2937;
+            --light: #f9fafb;
+            --gray: #6b7280;
+            --gray-light: #e5e7eb;
+            --border-radius: 12px;
+            --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: var(--light);
+            line-height: 1.6;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 30px;
+            background: rgba(30, 41, 59, 0.7);
+            border-radius: var(--border-radius);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary), var(--accent));
+        }
+
+        .logo {
+            font-size: 3.5rem;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo .emoji {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .title {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(90deg, var(--primary), var(--secondary), var(--accent));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            font-size: 1.1rem;
+            color: var(--gray-light);
+            max-width: 800px;
+            margin: 0 auto 20px;
+        }
+
+        .metadata {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 8px 16px;
+            border-radius: 50px;
+            font-size: 0.9rem;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 30px;
+            background: rgba(30, 41, 59, 0.7);
+            padding: 15px;
+            border-radius: var(--border-radius);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .tab {
+            padding: 12px 24px;
+            background: rgba(255, 255, 255, 0.05);
+            border: none;
+            border-radius: var(--border-radius);
+            color: var(--gray-light);
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tab:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        .tab.active {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 5px 15px rgba(59, 130, 246, 0.3);
+        }
+
+        /* Content */
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .card {
+            background: rgba(30, 41, 59, 0.7);
+            border-radius: var(--border-radius);
+            padding: 30px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .card-icon {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .card-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: white;
+        }
+
+        .card-subtitle {
+            color: var(--gray-light);
+            font-size: 1rem;
+            margin-top: 5px;
+        }
+
+        /* Phases */
+        .phase {
+            margin-bottom: 30px;
+            padding-bottom: 30px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .phase:last-child {
+            border-bottom: none;
+        }
+
+        .phase-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .phase-number {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--accent), #ea580c);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 1.2rem;
+        }
+
+        .phase-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: white;
+        }
+
+        .phase-subtitle {
+            color: var(--gray-light);
+            font-size: 1rem;
+            margin-top: 5px;
+        }
+
+        .checklist {
+            list-style: none;
+            margin: 20px 0;
+        }
+
+        .checklist li {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 12px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            transition: var(--transition);
+        }
+
+        .checklist li:hover {
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .checklist li i {
+            color: var(--success);
+            margin-top: 3px;
+        }
+
+        /* Code blocks */
+        .code-block {
+            background: #0f172a;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            overflow-x: auto;
+            border-left: 4px solid var(--primary);
+        }
+
+        .code-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .code-title {
+            font-weight: 600;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .copy-btn {
+            background: rgba(59, 130, 246, 0.2);
+            border: 1px solid rgba(59, 130, 246, 0.4);
+            color: var(--primary);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .copy-btn:hover {
+            background: rgba(59, 130, 246, 0.3);
+        }
+
+        pre {
+            white-space: pre-wrap;
+            color: #e2e8f0;
+            line-height: 1.5;
+        }
+
+        .code-comment { color: #64748b; }
+        .code-keyword { color: #f472b6; }
+        .code-string { color: #34d399; }
+        .code-function { color: #60a5fa; }
+        .code-number { color: #fbbf24; }
+
+        /* Grid */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 25px;
+            margin: 30px 0;
+        }
+
+        .grid-item {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: var(--border-radius);
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: var(--transition);
+        }
+
+        .grid-item:hover {
+            transform: translateY(-5px);
+            border-color: rgba(59, 130, 246, 0.3);
+            box-shadow: var(--shadow);
+        }
+
+        .grid-icon {
+            font-size: 2rem;
+            margin-bottom: 15px;
+            color: var(--primary);
+        }
+
+        .grid-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: white;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 30px;
+            margin-top: 50px;
+            color: var(--gray);
+            font-size: 0.9rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .signature {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+            font-size: 1.2rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .title { font-size: 2rem; }
+            .logo { font-size: 2.5rem; }
+            .tabs { justify-content: center; }
+            .tab { padding: 10px 15px; }
+            .grid { grid-template-columns: 1fr; }
+            .metadata { flex-direction: column; align-items: center; }
+        }
+
+        /* Utils */
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 50px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-right: 8px;
+            margin-bottom: 8px;
+        }
+
+        .badge-primary { background: rgba(59, 130, 246, 0.2); color: var(--primary); }
+        .badge-success { background: rgba(16, 185, 129, 0.2); color: var(--success); }
+        .badge-warning { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+        .badge-danger { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+
+        .highlight {
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .emoji { font-style: normal; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <span class="emoji">🦾</span>
+                <span class="emoji">✨</span>
+                <span class="emoji">➰</span>
+            </div>
+            <h1 class="title">Dashboard Traje Iron Man</h1>
+            <p class="subtitle">Metodología <span class="highlight">NIVEL DIOS</span> para operaciones masivas en Plane. Diseñada para ser reutilizable en <span class="highlight">CUALQUIER MISIÓN</span> con precisión quirúrgica y trazabilidad total.</p>
+            
+            <div class="metadata">
+                <div class="meta-item">
+                    <i class="fas fa-calendar"></i>
+                    <span>Fecha creación: 15 abril 2026, 21:47 CST</span>
+                </div>
+                <div class="meta-item">
+                    <i class="fas fa-certificate"></i>
+                    <span>Certificación: NIVEL DIOS EMPÍRICO</span>
+                </div>
+                <div class="meta-item">
+                    <i class="fas fa-bolt"></i>
+                    <span>Inspirado por: Fase 1 Traje Iron Man Validada</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" data-tab="overview">
+                <i class="fas fa-home"></i> Overview
+            </button>
+            <button class="tab" data-tab="phases">
+                <i class="fas fa-project-diagram"></i> Fases
+            </button>
+            <button class="tab" data-tab="templates">
+                <i class="fas fa-code"></i> Plantillas SQL
+            </button>
+            <button class="tab" data-tab="script">
+                <i class="fas fa-terminal"></i> Script CLI
+            </button>
+            <button class="tab" data-tab="checklist">
+                <i class="fas fa-clipboard-check"></i> Checklist
+            </button>
+            <button class="tab" data-tab="mision">
+                <i class="fas fa-rocket"></i> Lanzar Misión
+            </button>
+        </div>
+
+        <!-- Tab Content -->
+        <main>
+            <!-- Overview -->
+            <div id="overview" class="tab-content active">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                        <div>
+                            <h2 class="card-title">¿Qué es el Traje Iron Man?</h2>
+                            <p class="card-subtitle">Una metodología probada para operaciones masivas en Plane</p>
+                        </div>
+                    </div>
+                    
+                    <p>El <span class="highlight">Traje Iron Man</span> es un sistema de procesamiento masivo diseñado para ejecutar operaciones a gran escala en <span class="highlight">Plane</span> (sistema de gestión de proyectos) con precisión quirúrgica y trazabilidad total.</p>
+                    
+                    <div class="grid">
+                        <div class="grid-item">
+                            <div class="grid-icon">
+                                <i class="fas fa-shield-alt"></i>
+                            </div>
+                            <h3 class="grid-title">Precisión Quirúrgica</h3>
+                            <p>Procesamiento por lotes controlados con validación entre cada lote y capacidad de rollback.</p>
+                        </div>
+                        
+                        <div class="grid-item">
+                            <div class="grid-icon">
+                                <i class="fas fa-book"></i>
+                            </div>
+                            <h3 class="grid-title">Bitácora Narrativa</h3>
+                            <p>Documentación automática con escala de asombro (3-5⭐) y métricas de impacto.</p>
+                        </div>
+                        
+                        <div class="grid-item">
+                            <div class="grid-icon">
+                                <i class="fas fa-recycle"></i>
+                            </div>
+                            <h3 class="grid-title">Reutilizable</h3>
+                            <p>Plantillas SQL parametrizables y script CLI configurable para cualquier misión.</p>
+                        </div>
+                    </div>
+                    
+                    <h3 style="margin-top: 30px; margin-bottom: 15px; color: white;">🏆 Lema Operativo</h3>
+                    <div class="code-block">
+                        <pre><code>"Consulta solo lectura → UPDATE por lotes → Bitácora narrativa = ÉXITO GARANTIZADO CON ASUSTO CONTROLADO" 🎯✨</code></pre>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">
+                            <i class="fas fa-cogs"></i>
+                        </div>
+                        <div>
+                            <h2 class="card-title">Componentes del Sistema</h2>
+                            <p class="card-subtitle">Todo lo necesario para operaciones masivas exitosas</p>
+                        </div>
+                    </div>
+                    
+                    <div class="checklist">
+                        <li>
+                            <i class="fas fa-check-circle"></i>
+                            <div>
+                                <strong>PLANTILLA MAESTRA</strong> (27,556 bytes) - Documentación completa de la metodología
+                            </div>
+                        </li>
+                        <li>
+                            <i class="fas fa-check-circle"></i>
+                            <div>
+                                <strong>SCRIPT PRINCIPAL</strong> (<code>operacion_traje_iron_man.py</code>) - CLI con interfaz profesional
+                            </div>
+                        </li>
+                        <li>
+                            <i class="fas fa-check-circle"></i>
+                            <div>
+                                <strong>PLANTILLAS SQL</strong> (<code>sql_templates/</code>) - Consultas predefinidas para limpieza y re-etiquetado
+                            </div>
+                        </li>
+                        <li>
+                            <i class="fas fa-check-circle"></i>
+                            <div>
+                                <strong>INFRAESTRUCTURA</strong> - Sistema de backups, bitácoras automáticas, validación integrada
+                            </div>
+                        </li>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Phases -->
+            <div id="phases" class="tab-content">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">
+                            <i class="fas fa-sitemap"></i>
+                        </div>
+                        <div>
+                            <h2 class="card-title">Metodología de 5 Fases</h2>
+                            <p class="card-subtitle">Proceso probado para operaciones masivas exitosas</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Fase 0 -->
+                    <div class="phase">
+                        <div class="phase-header">
+                            <div class="phase-number">0</div>
+                            <div>
+                                <h3 class="phase-title">Preparación del Entorno</h3>
+                                <p class="phase-subtitle">Verificar que todos los sistemas están operativos</p>
+                            </div>
+                        </div>
+                        
+                        <div class="checklist">
+                            <li>
+                                <i class="fas fa-database"></i>
+                                <div>
+                                    <strong>Conexión PostgreSQL (Plane)</strong> - Contenedor docker activo y conexión verificada
+                                </div>
+                            </li>
+                            <li>
+                                <i class="fas fa-terminal"></i>
+                                <div>
+                                    <strong>FastAPI CLI operativo</strong> - Comandos <code>--momento</code>, <code>--cuentame</code>, <code>build-bitacora</code>
+                                </div>
+                            </li>
+                            <li>
+                                <i class="fas fa-tachometer-alt"></i>
+                                <div>
+                                    <strong>Dashboard War Room activo</strong> - Servidor localhost:5050 respondiendo
+                                </div>
+                            </li>
+                            <li>
+                                <i class="fas fa-save"></i>
+                                <div>
+                                    <strong>Backup pre-operación</strong> - NO NEGOCIABLE (dual: plain + custom format)
+                                </div>
+                            </li>
+                        </div>
+                    </div>
+                    
+                    <!-- Fase 1 -->
+                    <div class="phase">
+                        <div class="phase-header">
+                            <div class="phase-number">1</div>
+                            <div>
+                                <h3 class="phase-title">Consulta Solo Lectura</h3>
+                                <p class="phase-subtitle">Análisis estratégico sin modificar la base de datos</p>
+                            </div>
+                        </div>
+                        
+                        <p>Identificar candidatos usando SQL de solo lectura con CTE + JOINS. Generar reporte analítico con métricas clave.</p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <div class="code-title">
+                                    <i class="fas fa-code"></i>
+                                    SQL de Análisis (Ejemplo)
+                                </div>
+                                <button class="copy-btn" onclick="copyCode(this)">
+                                    <i class="fas fa-copy"></i> Copiar
+                                </button>
+                            </div>
+                            <pre><code><span class="code-comment">-- Identificar issues LOW obsoletos (>30 días sin actividad)</span>
+<span class="code-keyword">WITH</span> candidatos <span class="code-keyword">AS</span> (
+    <span class="code-keyword">SELECT</span> 
+        i.id,
+        i.sequence_id,
+        i.name,
+        s.name <span class="code-keyword">as</span> estado,
+        <span class="code-function">EXTRACT</span>(<span class="code-keyword">DAY FROM NOW</span>() - i.updated_at) <span class="code-keyword">as</span> dias_inactivos
+    <span class="code-keyword">FROM</span> plane_issue i
+    <span class="code-keyword">JOIN</span> plane_state s <span class="code-keyword">ON</span> i.state_id = s.id
+    <span class="code-keyword">JOIN</span> plane_issue_label il <span class="code-keyword">ON</span> i.id = il.issue_id
+    <span class="code-keyword">JOIN</span> plane_label l <span class="code-keyword">ON</span> il.label_id = l.id
+    <span class="code-keyword">WHERE</span> 
+        s.name <span class="code-keyword">IN</span> (<span class="code-string">'backlog'</span>, <span class="code-string">'unstarted'</span>)
+        <span class="code-keyword">AND</span> l.name = <span class="code-string">'low'</span>
+        <span class="code-keyword">AND</span> i.archived_at <span class="code-keyword">IS NULL</span>
+        <span class="code-keyword">AND</span> <span class="code-function">EXTRACT</span>(<span class="code-keyword">DAY FROM NOW</span>() - i.updated_at) > <span class="code-number">30</span>
+    <span class="code-keyword">ORDER BY</span> i.updated_at <span class="code-keyword">ASC</span>
+    <span class="code-keyword">LIMIT</span> <span class="code-number">100</span>
+)
+<span class="code-keyword">SELECT</span> * <span class="code-keyword">FROM</span> candidatos;</code></pre>
+                        </div>
+                    </div>
+                    
+                    <!-- Fase 2 -->
+                    <div class="phase">
+                        <div class="phase-header">
+                            <div class="phase-number">2</div>
+                            <div>
+                                <h3 class="phase-title">UPDATE por Lotes</h3>
+                                <p class="phase-subtitle">Precisión quirúrgica con rollback capacity</p>
+                            </div>
+                        </div>
+                        
+                        <p>Procesar candidatos en lotes controlados (default: 20 issues por lote) con validación entre lotes.</p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <div class="code-title">
+                                    <i class="fas fa-code"></i>
+                                    SQL de UPDATE por Lotes
+                                </div>
+                                <button class="copy-btn" onclick="copyCode(this)">
+                                    <i class="fas fa-copy"></i> Copiar
+                                </button>
+                            </div>
+                            <pre><code><span class="code-keyword">WITH</span> batch <span class="code-keyword">AS</span> (
+    <span class="code-keyword">SELECT</span> id
+    <span class="code-keyword">FROM</span> plane_issue
+    <span class="code-keyword">WHERE</span> id <span class="code-keyword">IN</span> (
+        <span class="code-comment">-- Subquery idéntica a Fase 1</span>
+        <span class="code-keyword">SELECT</span> i.id
+        <span class="code-keyword">FROM</span> plane_issue i
+        <span class="code-keyword">JOIN</span> plane_state s <span class="code-keyword">ON</span> i.state_id = s.id
+        <span class="code-keyword">WHERE</span> s.name <span class="code-keyword">IN</span> (<span class="code-string">'backlog'</span>, <span class="code-string">'unstarted'</span>)
+        <span class="code-keyword">AND</span> l.name = <span class="code-string">'low'</span>
+        <span class="code-keyword">LIMIT</span> <span class="code-number">20</span>  <span class="code-comment">-- ¡LOTE PEQUEÑO!</span>
+    )
+    <span class="code-keyword">FOR UPDATE SKIP LOCKED</span>
+)
+<span class="code-keyword">UPDATE</span> plane_issue i
+<span class="code-keyword">SET</span> 
+    state_id = (<span class="code-keyword">SELECT</span> id <span class="code-keyword">FROM</span> plane_state <span class="code-keyword">WHERE</span> name = <span class="code-string">'completed'</span>),
+    updated_at = <span class="code-function">NOW</span>(),
+    completed_at = <span class="code-function">NOW</span>()
+<span class="code-keyword">FROM</span> batch b
+<span class="code-keyword">WHERE</span> i.id = b.id
+<span class="code-keyword">RETURNING</span> i.id, i.sequence_id, i.name;</code></pre>
+                        </div>
+                    </div>
+                    
+                    <!-- Fase 3 -->
+                    <div class="phase">
+                        <div class="phase-header">
+                            <div class="phase-number">3</div>
+                            <div>
+                                <h3 class="phase-title">Bitácora Narrativa</h3>
+                                <p class="phase-subtitle">Documentación con escala de asombro y métricas</p>
+                            </div>
+                        </div>
+                        
+                        <p>Generar bitácora automática con escala de asombro (3-5⭐), métricas de impacto y lecciones aprendidas.</p>
+                        
+                        <div class="grid">
+                            <div class="grid-item">
+                                <div class="grid-icon">
+                                    <i class="fas fa-star"></i>
+                                </div>
+                                <h3 class="grid-title">Escala de Asombro</h3>
+                                <p><span class="badge badge-warning">3⭐</span> Procedimiento rutinario<br>
+                                <span class="badge badge-primary">4⭐</span> Resultados superiores<br>
+                                <span class="badge badge-success">5⭐</span> ¡NO ME LO CREO, JEFE!</p>
+                            </div>
+                            
+                            <div class="grid-item">
+                                <div class="grid-icon">
+                                    <i class="fas fa-chart-line"></i>
+                                </div>
+                                <h3 class="grid-title">Métricas Clave</h3>
+                                <p>• Candidatos identificados<br>
+                                • Issues actualizados<br>
+                                • Lotes procesados<br>
+                                • Tasa de éxito<br>
+                                • Duración total</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Fase 4 -->
+                    <div class="phase">
+                        <div class="phase-header">
+                            <div class="phase-number">4</div>
+                            <div>
+                                <h3 class="phase-title">Validación y Cierre</h3>
+                                <p class="phase-subtitle">Confirmación final y preparación para próxima misión</p>
+                            </div>
+                        </div>
+                        
+                        <div class="checklist">
+                            <li>
+                                <i class="fas fa-check-double"></i>
+                                <div>
+                                    <strong>Validación SQL post-operación</strong> - Confirmar 0 fallidos en cambios aplicados
+                                </div>
+                            </li>
+                            <li>
+                                <i class="fas fa-sync-alt"></i>
+                                <div>
+                                    <strong>Actualizar Dashboard War Room</strong> - Enviar métricas para visualización
+                                </div>
+                            </li>
+                            <li>
+                                <i class="fas fa-paper-plane"></i>
+                                <div>
+                                    <strong>Notificación Telegram</strong> - Resumen ejecutivo a Gus
+                                </div>
+                            </li>
+                            <li>
+                                <i class="fas fa-archive"></i>
+                                <div>
+                                    <strong>Backup post-operación</strong> - Snapshot del estado exitoso
+                                </div>
+                            </li>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Templates -->
+            <div id="templates" class="tab-content">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">
+                            <i class="fas fa-database"></i>
+                        </div>
+                        <div>
+                            <h2 class="card-title">Plantillas SQL Reutilizables</h2>
+                            <p class="card-subtitle">Para cualquier misión de procesamiento masivo</p>
+                        </div>
+                    </div>
+                    
+                    <div class="grid">
+                        <div class="grid-item">
+                            <div class="grid-icon">
+                                <i class="fas fa-broom"></i>
+                            </div>
+                            <h3 class="grid-title">01 - Limpieza Obsoletos</h3>
+                            <p>Issues LOW en backlog/unstarted >30 días → completed</p>
+                            <div style="margin-top: 15px;">
+                                <span class="badge badge-primary">LOW priority</span>
+                                <span class="badge badge-warning">>30 días</span>
+                                <span class="badge badge-success">completed</span>
+                            </div>
+                            <p style="margin-top: 15px; font-size: 0.9rem;"><i class="fas fa-file-code"></i> <code>sql_templates/01_limpieza_obsoletos.sql</code></p>
+                        </div>
+                        
+                        <div class="grid-item">
+                            <div class="grid-icon">
+                                <i class="fas fa-tags"></i>
+                            </div>
+                            <h3 class="grid-title">02 - Re-etiquetado Masivo</h3>
+                            <p>Agregar/remover etiquetas basado en criterios específicos</p>
+                            <div style="margin-top: 15px;">
+                                <span class="badge badge-primary">auto-done</span>
+                                <span class="badge badge-warning">completed</span>
+                                <span class="badge badge-success">1 hour</span>
+                            </div>
+                            <p style="margin-top: 15px; font-size: 0.9rem;"><i class="fas fa-file-code"></i> <code>sql_templates/02_reetiquetado_masivo.sql</code></p>
+                        </div>
+                        
+                        <div class="grid-item">
+                            <div class="grid-icon">
+                                <i class="fas fa-archive"></i>
+                            </div>
+                            <h3 class="grid-title">03 - Archivado Masivo</h3>
+                            <p>Issues completados >90 días → archivado automático</p>
+                            <div style="margin-top: 15px;">
+                                <span class="badge badge-primary">completed</span>
+                                <span class="badge badge-warning">>90 días</span>
+                                <span class="badge badge-danger">archived</span>
+                            </div>
+                            <p style="margin-top: 15px; font-size: 0.9rem;"><i class="fas fa-file-code"></i> <em>Por crear</em></p>
+                        </div>
+                    </div>
+                    
+                    <h3 style="margin-top: 40px; margin-bottom: 20px; color: white;">📁 Estructura de Directorios</h3>
+                    <div class="code-block">
+                        <pre><code>~/.openclaw/workspace/operaciones_traje_iron_man/
+├── PLANTILLA_OPERACION_TRAJE_IRON_MAN.md          # Esta plantilla
+├── scripts/
+│   ├── operacion_traje_iron_man.py                # Script principal
+│   ├── plane_db_helper.py                         # Conexión BD
+│   └── sql_templates/
+│       ├── 01_limpieza_obsoletos.sql
+│       ├── 02_reetiquetado_masivo.sql
+│       └── 03_archivado_masivo.sql
+├── bitacoras/                                     # Bitácoras generadas
+└── backups/                                       # Backups pre/post</code></pre>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Script -->
+            <div id="script" class="tab-content">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">
+                            <i class="fas fa-terminal"></i>
+                        </div>
+                        <div>
+                            <h2 class="card-title">Script CLI Principal</h2>
+                            <p class="card-subtitle"><code>operacion_traje_iron_man.py</code> - Interfaz de línea de comandos</p>
+                        </div>
+                    </div>
+                    
+                    <h3 style="margin-bottom: 15px; color: white;">🚀 Uso Básico</h3>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <div class="code-title">
+                                <i class="fas fa-terminal"></i>
+                                Comandos disponibles
+                            </div>
+                            <button class="copy-btn" onclick="copyCode(this)">
+                                <i class="fas fa-copy"></i> Copiar
+                            </button>
+                        </div>
+                        <pre><code><span class="code-comment"># Ayuda completa</span>
+python3 operacion_traje_iron_man.py --help
+
+<span class="code-comment"># Limpieza issues LOW obsoletos (dry-run primero)</span>
+python3 operacion_traje_iron_man.py --mision "Limpieza primaveral" \
+  --plantilla limpieza --lote 20 --dry-run
+
+<span class="code-comment"># Ejecución real después de validar dry-run</span>
+python3 operacion_traje_iron_man.py --mision "Limpieza primaveral" \
+  --plantilla limpieza --lote 20
+
+<span class="code-comment"># SQL personalizado</span>
+python3 operacion_traje_iron_man.py --mision "Personalizada" \
+  --analisis "SELECT id FROM issues WHERE state = 'backlog'" \
+  --update "UPDATE issues SET state = 'completed' WHERE id IN ({ids_placeholder})"</code></pre>
+                    </div>
+                    
+                    <h3 style="margin-top: 30px; margin-bottom: 15px; color: white;">⚙️ Opciones del CLI</h3>
+                    <div class="grid">
+                        <div class="grid-item">
+                            <div class="grid-icon">
+                                <i class="fas fa-flag"></i>
+                            </div>
+                            <h3 class="grid-title">--mision (requerido)</h3>
+                            <p>Nombre descriptivo de la misión. Aparece en bitácoras y logs.</p>
+                        </div>
+                        
+                        <div class="grid-item">
+                            <div class="grid-icon">
+                                <i class="fas fa-layer-group"></i>
+                            </div>
+                            <h3 class="grid-title">--lote (default: 20)</h3>
+                            <p>Tamaño de lote para procesamiento. Recomendado: 20 issues por lote.</p>
+                        </div>
+                        
+                        <div class="grid-item">
+                            <div class="grid-icon">
+                                <i class="fas fa-vial"></i>
+                            </div>
+                            <h3 class="grid-title">--dry-run</h3>
+                            <p>Solo análisis, sin cambios reales. Perfecto para validación previa.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="grid" style="margin-top: 20px;">
+                        <div class="grid-item">
+                            <div class="grid-icon">
+                                <i class="fas fa-th-large"></i>
+                            </div>
+                            <h3 class="grid-title">--plantilla</h3>
+                            <p>Plantilla predefinida: <code>limpieza</code> o <code>archivado</code>.</p>
+                        </div>
+                        
+                        <div class="grid-item">
+                            <div class="grid-icon">
+                                <i class="fas fa-code"></i>
+                            </div>
+                            <h3 class="grid-title">--analisis / --update</h3>
+                            <p>SQL personalizado para análisis y actualización.</p>
+                        </div>
+                        
+                        <div class="grid-item">
+                            <div class="grid-icon">
+                                <i class="fas fa-check-double"></i>
+                            </div>
+                            <h3 class="grid-title">--validacion</h3>
+                            <p>SQL personalizado para validación post-operación.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Checklist -->
+            <div id="checklist" class="tab-content">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">
+                            <i class="fas fa-clipboard-list"></i>
+                        </div>
+                        <div>
+                            <h2 class="card-title">Checklist de Implementación</h2>
+                            <p class="card-subtitle">Para cualquier misión con el Traje Iron Man</p>
+                        </div>
+                    </div>
+                    
+                    <h3 style="margin-bottom: 20px; color: white;">📋 Antes de Ejecutar</h3>
+                    <div class="checklist">
+                        <li>
+                            <i class="far fa-square"></i>
+                            <div>
+                                <strong>Leer plantilla completa</strong> - No saltarse pasos, entender la metodología
+                            </div>
+                        </li>
+                        <li>
+                            <i class="far fa-square"></i>
+                            <div>
+                                <strong>Verificar entorno</strong> - PostgreSQL, FastAPI CLI, Dashboard operativos
+                            </div>
+                        </li>
+                        <li>
+                            <i class="far fa-square"></i>
+                            <div>
+                                <strong>Definir misión clara</strong> - ¿Qué queremos lograr? ¿Qué criterios?
+                            </div>
+                        </li>
+                        <li>
+                            <i class="far fa-square"></i>
+                            <div>
+                                <strong>Preparar SQL de análisis</strong> - Fase 1: solo lectura, bien probada
+                            </div>
+                        </li>
+                        <li>
+                            <i class="far fa-square"></i>
+                            <div>
+                                <strong>Preparar SQL de actualización</strong> - Fase 2: con {ids_placeholder}
+                            </div>
+                        </li>
+                        <li>
+                            <i class="far fa-square"></i>
+                            <div>
+                                <strong>Configurar tamaño de lote</strong> - Recomendado: 20 (checkpoint cada 20)
+                            </div>
+                        </li>
+                        <li>
+                            <i class="far fa-square"></i>
+                            <div>
+                                <strong>Hacer backup pre-operación</strong> - NO NEGOCIABLE
+                            </div>
+                        </li>
+                    </div>
+                    
+                    <h3 style="margin-top: 40px; margin-bottom: 20px; color: white;">⚡ Durante Ejecución</h3>
+                    <div class="checklist">
+                        <li>
+                            <i class="far fa-square"></i>
+                            <div>
+                                <strong>Seguir fases secuencialmente</strong> - 0→1→2→3→4 sin saltar
+                            </div>
+                        </li>
+                        <li>
+                            <i class="far fa-square"></i>
+                            <div>
+                                <strong>Validar cada lote</strong> - Antes de continuar con siguiente lote
+                            </div>
+                        </li>
+                        <li>
+                            <i class="far fa-square"></i>
+                            <div>
+                                <strong>Registrar en bitácora</strong> - Después de cada fase y cada lote
+                            </div>
+                        </li>
+                        <li>
+                            <i class="far fa-square"></i>
+                            <div>
+                                <strong>Monitorear métricas</strong> - En tiempo real: candidatos, actualizados, errores
+                            </div>
+                        </li>
+                    </div>
+                    
+                    <h3 style="margin-top: 40px; margin-bottom: 20px; color: white;">🎯 Después de Ejecutar</h3>
+                    <div class="checklist">
+                        <li>
+                            <i class="far fa-square"></i>
+                            <div>
+                                <strong>Validar resultados</strong> - SQL de confirmación con 0 fallidos
+                            </div>
+                        </li>
+                        <li>
+                            <i class="far fa-square"></i>
+                            <div>
+                                <strong>Generar bitácora narrativa</strong> - Con escala de asombro automática
+                            </div>
+                        </li>
+                        <li>
+                            <i class="far fa-square"></i>
+                            <div>
+                                <strong>Actualizar Dashboard War Room</strong> - Métricas para visualización
+                            </div>
+                        </li>
+                        <li>
+                            <i class="far fa-square"></i>
+                            <div>
+                                <strong>Enviar notificación Telegram</strong> - Resumen ejecutivo a Gus
+                            </div>
+                        </li>
+                        <li>
+                            <i class="far fa-square"></i>
+                            <div>
+                                <strong>Hacer backup post-operación</strong> - Snapshot del estado exitoso
+                            </div>
+                        </li>
+                        <li>
+                            <i class="far fa-square"></i>
+                            <div>
+                                <strong>Actualizar plantilla</strong> - Incorporar lecciones aprendidas
+                            </div>
+                        </li>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Launch Mission -->
+            <div id="mision" class="tab-content">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">
+                            <i class="fas fa-rocket"></i>
+                        </div>
+                        <div>
+                            <h2 class="card-title">Lanzar Nueva Misión</h2>
+                            <p class="card-subtitle">Selecciona el tipo de operación y personaliza los parámetros</p>
+                        </div>
+                    </div>
+                    
+                    <div class="grid">
+                        <div class="grid-item" style="cursor: pointer;" onclick="selectMission('limpieza')">
+                            <div class="grid-icon">
+                                <i class="fas fa-broom"></i>
+                            </div>
+                            <h3 class="grid-title">Limpieza Obsoletos</h3>
+                            <p>Issues LOW en backlog/unstarted >30 días sin actividad.</p>
+                            <div style="margin-top: 15px;">
+                                <span class="badge badge-warning">Recomendado para empezar</span>
+                            </div>
+                        </div>
+                        
+                        <div class="grid-item" style="cursor: pointer;" onclick="selectMission('archivado')">
+                            <div class="grid-icon">
+                                <i class="fas fa-archive"></i>
+                            </div>
+                            <h3 class="grid-title">Archivado Completados</h3>
+                            <p>Issues completados >90 días → archivado automático.</p>
+                            <div style="margin-top: 15px;">
+                                <span class="badge badge-primary">Limpieza profunda</span>
+                            </div>
+                        </div>
+                        
+                        <div class="grid-item" style="cursor: pointer;" onclick="selectMission('etiquetar')">
+                            <div class="grid-icon">
+                                <i class="fas fa-tags"></i>
+                            </div>
+                            <h3 class="grid-title">Etiquetado Automático</h3>
+                            <p>Aplica la etiqueta <code>auto-generated</code> a issues archivados recientes.</p>
+                            <div style="margin-top: 15px;">
+                                <span class="badge badge-success">Post-proceso recomendado</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="mission-config" style="margin-top: 40px; display: none;">
+                        <h3 style="margin-bottom: 20px; color: white;">🚀 Configuración de Misión</h3>
+                        
+                        <div style="background: rgba(0,0,0,0.2); padding: 25px; border-radius: 10px; margin-bottom: 25px;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                                <div>
+                                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">Nombre de Misión</label>
+                                    <input type="text" id="mission-name" placeholder="Ej: Limpieza primaveral" style="width: 100%; padding: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: white; font-family: 'Inter', sans-serif;">
+                                </div>
+                                <div>
+                                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">Tamaño de Lote</label>
+                                    <input type="number" id="batch-size" value="20" min="5" max="100" style="width: 100%; padding: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: white; font-family: 'Inter', sans-serif;">
+                                </div>
+                            </div>
+                            
+                            <div style="margin-bottom: 20px;">
+                                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                                    <input type="checkbox" id="dry-run" checked>
+                                    <span>Ejecutar en modo <strong>dry-run</strong> primero (solo análisis, sin cambios)</span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div style="background: rgba(0,0,0,0.2); padding: 25px; border-radius: 10px; margin-bottom: 25px;">
+                            <h4 style="margin-bottom: 12px; color: white;">Estado Operativo</h4>
+                            <div class="small" id="status-next-run">Próxima ejecución: cargando...</div>
+                            <div class="small" id="status-last-op">Última operación: cargando...</div>
+                            <div class="small" id="status-last-result">Resultado: -</div>
+                            <div class="small" id="status-refresh-at">Actualizado: -</div>
+                        </div>
+                        
+                        <h3 style="margin-top: 30px; margin-bottom: 15px; color: white;">📋 Payload API</h3>
+                        <div class="code-block">
+                            <div class="code-header">
+                                <div class="code-title">
+                                    <i class="fas fa-network-wired"></i>
+                                    POST /api/traje-iron-man/run
+                                </div>
+                                <button class="copy-btn" onclick="copyGeneratedCommand()">
+                                    <i class="fas fa-copy"></i> Copiar Payload
+                                </button>
+                            </div>
+                            <pre id="generated-command"><code><span class="code-comment"># Selecciona un tipo de misión para generar el payload</span></code></pre>
+                        </div>
+                        <div class="small" id="mission-run-status" style="margin-top: 10px;">Listo.</div>
+                        
+                        <div style="display: flex; gap: 15px; margin-top: 30px;">
+                            <button onclick="generateCommand()" style="flex: 1; padding: 15px; background: linear-gradient(90deg, var(--primary), var(--primary-dark)); border: none; border-radius: 10px; color: white; font-weight: 600; font-size: 1rem; cursor: pointer; transition: var(--transition);">
+                                <i class="fas fa-bolt"></i> Generar Payload
+                            </button>
+                            <button onclick="runMissionFromApi()" style="flex: 1; padding: 15px; background: linear-gradient(90deg, #10b981, #059669); border: none; border-radius: 10px; color: white; font-weight: 600; font-size: 1rem; cursor: pointer; transition: var(--transition);">
+                                <i class="fas fa-play"></i> Ejecutar via API
+                            </button>
+                            <button onclick="resetMission()" style="flex: 1; padding: 15px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; color: var(--gray-light); font-weight: 600; font-size: 1rem; cursor: pointer; transition: var(--transition);">
+                                <i class="fas fa-redo"></i> Reiniciar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Dashboard Traje Iron Man • Metodología NIVEL DIOS • Certificación Empírica</p>
+            <div class="signature">
+                <span class="emoji">➰</span>
+                <span>Creado con ❤️ por Metiche - Duende digital de Masa Madre Monterrey</span>
+                <span class="emoji">✨</span>
+            </div>
+            <p style="margin-top: 20px; font-size: 0.8rem;">
+                <i class="fas fa-code"></i> HTML autocontenido • 
+                <i class="fas fa-sync-alt"></i> Actualizado: 16 abril 2026, 07:28 CST •
+                <i class="fas fa-bolt"></i> <span class="highlight">NIVEL DIOS ACTIVADO</span>
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Remove active class from all tabs and contents
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                
+                // Add active class to clicked tab and corresponding content
+                tab.classList.add('active');
+                const tabId = tab.getAttribute('data-tab');
+                document.getElementById(tabId).classList.add('active');
+            });
+        });
+
+        // Copy code blocks
+        function copyCode(button) {
+            const codeBlock = button.closest('.code-block').querySelector('pre');
+            const text = codeBlock.innerText;
+            
+            navigator.clipboard.writeText(text).then(() => {
+                const originalHtml = button.innerHTML;
+                button.innerHTML = '<i class="fas fa-check"></i> Copiado!';
+                button.style.background = 'rgba(16, 185, 129, 0.2)';
+                button.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+                button.style.color = 'var(--success)';
+                
+                setTimeout(() => {
+                    button.innerHTML = originalHtml;
+                    button.style.background = '';
+                    button.style.borderColor = '';
+                    button.style.color = '';
+                }, 2000);
+            });
+        }
+
+        // Mission configuration
+        let selectedMission = '';
+        
+        function selectedOperation() {
+            if (selectedMission === 'limpieza') return 'limpiar-low';
+            if (selectedMission === 'archivado') return 'archivar';
+            if (selectedMission === 'etiquetar') return 'etiquetar';
+            return '';
+        }
+
+        function buildPayload() {
+            const operation = selectedOperation();
+            if (!operation) return null;
+            const batchSize = Number(document.getElementById('batch-size').value || 20);
+            return {
+                operacion: operation,
+                lote: batchSize,
+                dry_run: document.getElementById('dry-run').checked
+            };
+        }
+
+        function selectMission(type) {
+            selectedMission = type;
+            document.getElementById('mission-config').style.display = 'block';
+            
+            // Update mission name placeholder
+            const missionName = document.getElementById('mission-name');
+            if (type === 'limpieza') missionName.placeholder = 'Ej: Limpieza primaveral de issues obsoletos';
+            if (type === 'archivado') missionName.placeholder = 'Ej: Archivado issues completados antiguos';
+            if (type === 'etiquetar') missionName.placeholder = 'Ej: Etiquetado post-archivado';
+            
+            generateCommand();
+        }
+        
+        function generateCommand() {
+            const payload = buildPayload();
+            if (!payload) return;
+            document.getElementById('generated-command').innerHTML = `<code>${JSON.stringify(payload, null, 2)}</code>`;
+        }
+        
+        function copyGeneratedCommand() {
+            const commandText = document.getElementById('generated-command').innerText;
+            navigator.clipboard.writeText(commandText).then(() => {
+                alert('Payload copiado al portapapeles.');
+            });
+        }
+
+        async function fetchStatus() {
+            try {
+                const response = await fetch('/api/traje-iron-man/status');
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const status = await response.json();
+                const nextExecution = status.next_execution || '-';
+                const last = status.last_operation || null;
+                document.getElementById('status-next-run').textContent = `Próxima ejecución: ${nextExecution}`;
+                if (last) {
+                    document.getElementById('status-last-op').textContent = `Última operación: ${last.operacion || '-'} (${last.trigger || 'manual'})`;
+                    document.getElementById('status-last-result').textContent = `Resultado: candidatos=${last.candidatos_identificados || 0}, actualizados=${last.issues_actualizados || 0}, errores=${last.errores || 0}`;
+                } else {
+                    document.getElementById('status-last-op').textContent = 'Última operación: sin historial';
+                    document.getElementById('status-last-result').textContent = 'Resultado: -';
+                }
+                document.getElementById('status-refresh-at').textContent = `Actualizado: ${new Date().toISOString()}`;
+            } catch (error) {
+                document.getElementById('status-next-run').textContent = 'Próxima ejecución: error consultando estado';
+                document.getElementById('status-refresh-at').textContent = `Actualizado: ${new Date().toISOString()}`;
+            }
+        }
+
+        async function runMissionFromApi() {
+            const payload = buildPayload();
+            if (!payload) return;
+            const statusNode = document.getElementById('mission-run-status');
+            statusNode.textContent = 'Ejecutando operación vía API...';
+            try {
+                const response = await fetch('/api/traje-iron-man/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.detail || `HTTP ${response.status}`);
+                }
+                document.getElementById('generated-command').innerHTML = `<code>${JSON.stringify(data, null, 2)}</code>`;
+                statusNode.textContent = `Operación completada: ok=${data.ok}, actualizados=${data.issues_actualizados || 0}`;
+                fetchStatus();
+            } catch (error) {
+                statusNode.textContent = `Error ejecutando operación: ${error.message}`;
+            }
+        }
+        
+        function resetMission() {
+            selectedMission = '';
+            document.getElementById('mission-config').style.display = 'none';
+            document.getElementById('mission-name').value = '';
+            document.getElementById('batch-size').value = '20';
+            document.getElementById('dry-run').checked = true;
+            document.getElementById('generated-command').innerHTML = '<code><span class="code-comment"># Selecciona un tipo de misión para generar el payload</span></code>';
+            document.getElementById('mission-run-status').textContent = 'Listo.';
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            // Add event listeners to mission inputs
+            ['mission-name', 'batch-size', 'dry-run'].forEach(id => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.addEventListener('input', generateCommand);
+                    element.addEventListener('change', generateCommand);
+                }
+            });
+            fetchStatus();
+            setInterval(fetchStatus, 60000);
+        });
+    </script>
+</body>
+</html>
