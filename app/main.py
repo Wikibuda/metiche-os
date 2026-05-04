@@ -9,6 +9,7 @@ from app.api.routes_dashboard import router as dashboard_router
 from app.api.routes_health import router as health_router
 from app.api.routes_memory import router as memory_router
 from app.api.routes_narrative import router as narrative_router
+from app.api.routes_plane_commands import router as plane_commands_router
 from app.api.routes_rules import router as rules_router
 from app.api.routes_soul import router as soul_router
 from app.api.routes_swarm import router as swarm_router
@@ -48,6 +49,7 @@ app.include_router(rules_router)
 app.include_router(dashboard_router)
 app.include_router(swarm_router)
 app.include_router(webhooks_router)
+app.include_router(plane_commands_router)
 
 
 @app.get("/admin-dashboard.html", include_in_schema=False)

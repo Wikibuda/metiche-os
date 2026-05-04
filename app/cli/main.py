@@ -21,6 +21,7 @@ from app.domain.narrative.narrator_selector import MinimalNarratorSelector
 from app.domain.tasks.models import TaskRunCreate
 from app.domain.tasks.service import process_next_task, run_task_flow
 from app.projections.bitacora import build_bitacora
+from app.services.plane_comment_watcher import process_plane_comment_commands
 from app.services.plane_bridge_service import process_plane_enjambre_pull
 
 cli = typer.Typer(no_args_is_help=True)
@@ -90,6 +91,7 @@ def run_worker() -> None:
     seed_core_data()
     selector = MinimalNarratorSelector()
     last_plane_watch_at = 0.0
+    last_plane_comment_watch_at = 0.0
     while True:
         with Session(engine) as session:
             result = process_next_task(session)
@@ -106,6 +108,18 @@ def run_worker() -> None:
                         f"launched={pull_result.get('launched')} scanned={pull_result.get('scanned')}"
                     )
                 last_plane_watch_at = now_ts
+            if (
+                settings.plane_sync_enabled
+                and settings.plane_comment_watch_enabled
+                and now_ts - last_plane_comment_watch_at >= max(5, settings.plane_comment_watch_interval_seconds)
+            ):
+                command_result = process_plane_comment_commands(limit=settings.plane_comment_watch_limit)
+                if command_result.get("ok") and command_result.get("processed"):
+                    typer.echo(
+                        "plane-comments procesados: "
+                        f"processed={command_result.get('processed')} skipped={command_result.get('skipped')}"
+                    )
+                last_plane_comment_watch_at = now_ts
             selected = selector.tick(session)
             promoted = selector.promote_pending_candidates(session, limit=50)
             build_bitacora(session, Path(settings.projections_root) / "bitacora" / "bitacora_de_asombros.md")

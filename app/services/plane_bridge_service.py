@@ -237,7 +237,7 @@ def sync_task_status_to_plane(session: Session, *, task: Task, failed_channels: 
     sync_status = "failed" if has_failure else "done"
 
     if has_failure and not link:
-        labels = ["metiche", "task:failed", f"task:{task.task_type}"]
+        labels = ["metiche", "managed:metiche", "sync:war-room", "task:failed", f"task:{task.task_type}"]
         description = (
             f"Tarea: {task.id}<br/>"
             f"Tipo: {task.task_type}<br/>"
@@ -428,7 +428,8 @@ def process_plane_enjambre_pull(session: Session, *, limit: int = 20) -> dict[st
         return {"ok": False, "reason": "plane_sync_disabled"}
 
     ensure_plane_bridge_tables(session)
-    pull = list_issues(limit=limit, labels=["run:enjambre"])
+    pull_label = (settings.plane_sync_pull_label or "run:enjambre").strip() or "run:enjambre"
+    pull = list_issues(limit=limit, labels=[pull_label])
     if not pull.ok:
         return {"ok": False, "reason": "list_issues_failed", "error": pull.error}
 
@@ -443,7 +444,7 @@ def process_plane_enjambre_pull(session: Session, *, limit: int = 20) -> dict[st
         if not issue_id:
             continue
         labels = _extract_label_names(issue)
-        if "run:enjambre" not in labels:
+        if pull_label not in labels:
             skipped_count += 1
             continue
 
@@ -483,7 +484,7 @@ def process_plane_enjambre_pull(session: Session, *, limit: int = 20) -> dict[st
             comment_on_issue(
                 issue_id,
                 (
-                    f"Metiche lanzó enjambre `{swarm.id}` desde etiqueta `run:enjambre`.<br/>"
+                    f"Metiche lanzó enjambre `{swarm.id}` desde etiqueta `{pull_label}`.<br/>"
                     f"Decisión: {run.decision if run else 'unknown'}."
                 ),
             )

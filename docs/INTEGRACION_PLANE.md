@@ -31,6 +31,12 @@ PLANE_ISSUES_BASE_URL=https://plane.midominio.com/issues
 PLANE_WATCH_ENABLED=true
 PLANE_WATCH_INTERVAL_SECONDS=20
 PLANE_WATCH_LIMIT=20
+PLANE_SYNC_PULL_LABEL=run:enjambre
+PLANE_COMMENT_WATCH_ENABLED=true
+PLANE_COMMENT_WATCH_INTERVAL_SECONDS=20
+PLANE_COMMENT_WATCH_LIMIT=20
+PLANE_COMMAND_AUTHOR_ALLOWLIST=gglunar@gmail.com
+PLANE_COMMAND_TIMEOUT_SECONDS=300
 ```
 
 ## 2) Sincronizacion Metiche -> Plane
@@ -58,13 +64,15 @@ curl -s "http://127.0.0.1:8091/dashboard/plane/issues?limit=30" | jq
 
 Flujo activo en worker:
 
-- El worker consulta issues con etiqueta `run:enjambre`.
+- El worker consulta issues con etiqueta configurable `PLANE_SYNC_PULL_LABEL` (default `run:enjambre`).
 - Por cada issue elegible, crea swarm y ejecuta un ciclo.
 - Publica comentario en el issue con el `swarm_id` y decision.
 
+Adicionalmente, el worker de comentarios procesa comandos `/metiche ...` con allowlist de autor y registra idempotencia en `plane_processed_comments`.
+
 Etiquetas recomendadas al crear issue en Plane:
 
-- Obligatoria para ejecucion: `run:enjambre`.
+- Obligatoria para ejecucion: etiqueta definida en `PLANE_SYNC_PULL_LABEL` (por defecto `run:enjambre`).
 - Opcional de clasificacion: `metiche:task`.
 
 Ejemplo conceptual de issue:
@@ -110,7 +118,7 @@ curl -s "http://127.0.0.1:8091/dashboard/plane/issues?limit=30" | jq
 
 ### No se lanzan enjambres
 
-- Confirma etiqueta exacta `run:enjambre`.
+- Confirma etiqueta configurada en `PLANE_SYNC_PULL_LABEL`.
 - Revisa logs del worker para `plane-watch lanzó enjambres`.
 - Verifica que el worker este corriendo continuamente.
 

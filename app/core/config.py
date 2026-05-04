@@ -48,6 +48,11 @@ class Settings(BaseSettings):
     plane_watch_enabled: bool = True
     plane_watch_interval_seconds: int = 20
     plane_watch_limit: int = 20
+    plane_comment_watch_enabled: bool = True
+    plane_comment_watch_interval_seconds: int = 20
+    plane_comment_watch_limit: int = 20
+    plane_command_author_allowlist: str = "gglunar@gmail.com"
+    plane_command_timeout_seconds: int = 300
 
     validation_timeout_seconds: int = 10
     validation_required_channels: str = ""
