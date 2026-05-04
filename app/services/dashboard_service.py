@@ -6,6 +6,7 @@ from uuid import uuid4
 from sqlalchemy import text
 from sqlmodel import Session, select
 
+from app.core.config import settings
 from app.domain.narrative.service import list_recent_narratives
 from app.domain.tasks.models import QueueEntry, Task, Validation
 from app.domain.tasks.service import build_operational_overview, derive_queue_bucket, normalize_priority, run_task_flow
@@ -86,6 +87,34 @@ def _extract_plane_issue_from_description(description: str | None) -> str | None
     chunk = source.split(marker, 1)[1]
     issue = chunk.split("]", 1)[0].strip()
     return issue or None
+
+
+def _build_plane_issue_url(issue_id: str | None) -> str | None:
+    if not issue_id:
+        return None
+    if settings.plane_issues_base_url:
+        return f"{settings.plane_issues_base_url.rstrip('/')}/{issue_id}"
+    base_url = (settings.plane_base_url or settings.plane_api_url or "").strip().rstrip("/")
+    if not base_url:
+        return None
+    if "api.plane.so" in base_url:
+        base_url = base_url.replace("api.plane.so", "app.plane.so")
+    if "/api/" in base_url:
+        base_url = base_url.split("/api/", 1)[0]
+    workspace = (settings.plane_workspace_slug or "").strip()
+    project = (settings.plane_project_id or "").strip()
+    if workspace and project:
+        return f"{base_url}/{workspace}/projects/{project}/issues/{issue_id}"
+    # Generic web fallback when workspace/project are unavailable.
+    return f"{base_url}/issues/{issue_id}"
+
+
+def _normalize_plane_issue_url(raw_url: str | None, issue_id: str | None) -> str | None:
+    candidate = (raw_url or "").strip()
+    if candidate.startswith(("http://", "https://")):
+        return candidate
+    # Legacy placeholder scheme should never be exposed to browser users.
+    return _build_plane_issue_url(issue_id)
 
 
 def _load_plane_sync_map(session: Session, task_ids: list[str]) -> dict[str, dict[str, Any]]:
@@ -348,7 +377,7 @@ def list_dashboard_tasks(
         queue_priority = normalize_priority(queue.priority) if queue else "medium"
         plane_sync = plane_sync_map.get(task.id, {})
         plane_issue_id = plane_sync.get("plane_issue_id") or _extract_plane_issue_from_description(task.description)
-        plane_issue_url = plane_sync.get("plane_issue_url") or (f"plane://issues/{plane_issue_id}" if plane_issue_id else None)
+        plane_issue_url = _normalize_plane_issue_url(plane_sync.get("plane_issue_url"), plane_issue_id)
         rows.append(
             {
                 "task_id": task.id,
@@ -471,7 +500,10 @@ def get_task_detail(session: Session, task_id: str) -> dict[str, Any] | None:
             "created_at": task.created_at,
             "updated_at": task.updated_at,
             "plane_issue_id": plane_sync.get("plane_issue_id") or _extract_plane_issue_from_description(task.description),
-            "plane_issue_url": plane_sync.get("plane_issue_url"),
+            "plane_issue_url": _normalize_plane_issue_url(
+                plane_sync.get("plane_issue_url"),
+                plane_sync.get("plane_issue_id") or _extract_plane_issue_from_description(task.description),
+            ),
         },
         "payload": {
             "title": task.title,

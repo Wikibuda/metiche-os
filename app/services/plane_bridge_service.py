@@ -4,7 +4,6 @@ import json
 import re
 from datetime import datetime
 from typing import Any
-from uuid import uuid4
 
 from sqlalchemy import text
 from sqlmodel import Session
@@ -197,6 +196,134 @@ def _upsert_plane_sync(
             },
         )
     session.commit()
+
+
+def _upsert_plane_sync_by_issue_id(
+    session: Session,
+    *,
+    task_id: str,
+    issue_id: str,
+    issue_url: str | None,
+    sync_status: str,
+    last_error: str | None = None,
+) -> None:
+    ensure_plane_bridge_tables(session)
+    now = datetime.utcnow()
+    row = session.connection().execute(
+        text("SELECT task_id FROM plane_sync WHERE plane_issue_id = :issue_id"),
+        {"issue_id": issue_id},
+    ).first()
+    if row:
+        session.connection().execute(
+            text(
+                """
+                UPDATE plane_sync
+                SET task_id = :task_id,
+                    plane_issue_url = :issue_url,
+                    sync_status = :sync_status,
+                    last_error = :last_error,
+                    last_synced_at = :last_synced_at,
+                    updated_at = :updated_at
+                WHERE plane_issue_id = :issue_id
+                """
+            ),
+            {
+                "task_id": task_id,
+                "issue_id": issue_id,
+                "issue_url": issue_url,
+                "sync_status": sync_status,
+                "last_error": last_error,
+                "last_synced_at": now,
+                "updated_at": now,
+            },
+        )
+        session.commit()
+        return
+    _upsert_plane_sync(
+        session,
+        task_id=task_id,
+        issue_id=issue_id,
+        issue_url=issue_url,
+        sync_status=sync_status,
+        last_error=last_error,
+    )
+
+
+def _issue_link_by_issue_id(session: Session, issue_id: str) -> dict[str, Any] | None:
+    ensure_plane_bridge_tables(session)
+    row = session.connection().execute(
+        text(
+            """
+            SELECT task_id, plane_issue_id, plane_issue_url, sync_status, last_synced_at, last_error
+            FROM plane_sync
+            WHERE plane_issue_id = :issue_id
+            LIMIT 1
+            """
+        ),
+        {"issue_id": issue_id},
+    ).first()
+    return dict(row._mapping) if row else None
+
+
+def _build_task_description_from_issue(issue: dict[str, Any]) -> str:
+    issue_id = str(issue.get("id") or "").strip()
+    issue_url = _issue_url(issue) or ""
+    issue_title = str(issue.get("name") or issue.get("title") or "").strip() or f"Issue {issue_id}"
+    objective = _strip_html(issue.get("description_html") or issue.get("description")) or issue_title
+    return (
+        f"Origen Plane issue: {issue_title}\n\n"
+        f"{objective}\n\n"
+        f"[plane_issue_id={issue_id}]\n"
+        f"[plane_issue_url={issue_url}]"
+    ).strip()
+
+
+def ensure_plane_issue_task_link(session: Session, *, issue: dict[str, Any]) -> dict[str, Any]:
+    ensure_plane_bridge_tables(session)
+    issue_id = str(issue.get("id") or "").strip()
+    if not issue_id:
+        return {"ok": False, "reason": "missing_issue_id"}
+
+    issue_url = _issue_url(issue)
+    existing = _issue_link_by_issue_id(session, issue_id)
+    if existing:
+        task_id = str(existing.get("task_id") or "").strip()
+        task = session.get(Task, task_id) if task_id else None
+        if task:
+            if issue_url and not str(existing.get("plane_issue_url") or "").strip():
+                _upsert_plane_sync_by_issue_id(
+                    session,
+                    task_id=task.id,
+                    issue_id=issue_id,
+                    issue_url=issue_url,
+                    sync_status=str(existing.get("sync_status") or "linked"),
+                    last_error=str(existing.get("last_error") or "") or None,
+                )
+            return {"ok": True, "created": False, "task_id": task.id, "issue_id": issue_id}
+
+    now = datetime.utcnow()
+    issue_title = str(issue.get("name") or issue.get("title") or "").strip() or f"Issue {issue_id}"
+    task = Task(
+        title=f"[Plane] {issue_title[:120]}",
+        description=_build_task_description_from_issue(issue),
+        execution_mode="queued",
+        task_type="enjambre",
+        status="queued",
+        created_at=now,
+        updated_at=now,
+    )
+    session.add(task)
+    session.commit()
+    session.refresh(task)
+
+    _upsert_plane_sync_by_issue_id(
+        session,
+        task_id=task.id,
+        issue_id=issue_id,
+        issue_url=issue_url,
+        sync_status="linked",
+    )
+    return {"ok": True, "created": True, "task_id": task.id, "issue_id": issue_id}
 
 
 def _get_issue_link_for_task(session: Session, task_id: str) -> dict[str, Any] | None:
@@ -457,6 +584,8 @@ def process_plane_enjambre_pull(session: Session, *, limit: int = 20) -> dict[st
         objective = _strip_html(issue.get("description_html") or issue.get("description")) or issue_title
         if len(objective) < 10:
             objective = f"Resolver issue Plane {issue_id}: {issue_title}"
+        link_result = ensure_plane_issue_task_link(session, issue=issue)
+        related_task_id = str(link_result.get("task_id") or "").strip() if link_result.get("ok") else None
 
         try:
             swarm = create_swarm(
@@ -474,7 +603,7 @@ def process_plane_enjambre_pull(session: Session, *, limit: int = 20) -> dict[st
                 swarm.id,
                 SwarmRunCreate(
                     objective=objective,
-                    related_task_id=None,
+                    related_task_id=related_task_id,
                     client_key=f"plane:{issue_id}",
                     max_cycles=1,
                 ),

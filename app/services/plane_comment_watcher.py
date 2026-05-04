@@ -21,9 +21,13 @@ from app.core.db import engine
 from app.domain.swarm.models import SwarmCreate, SwarmRunCreate
 from app.domain.swarm.service import create_swarm, run_swarm_cycle
 from app.integrations.plane import comment_on_issue, get_issue
-from app.services.dashboard_service import get_dashboard_stats, perform_task_action
-from app.services.plane_bridge_service import process_plane_enjambre_pull
-from app.services.traje_iron_man.operaciones import get_traje_status, run_traje_operation
+from app.services.dashboard_service import get_dashboard_stats, map_task_status, perform_task_action
+from app.services.plane_bridge_service import ensure_plane_issue_task_link, process_plane_enjambre_pull
+try:
+    from app.services.traje_iron_man.operaciones import get_traje_status, run_traje_operation
+except Exception:  # pragma: no cover - optional module in some deployments
+    get_traje_status = None
+    run_traje_operation = None
 
 PENDING_COMMAND_LABEL = "pending-command"
 LAST_ACTION_OK_LABEL = "last-action:ok"
@@ -131,15 +135,23 @@ def process_plane_comment_commands(*, limit: int = 20) -> dict[str, Any]:
                 continue
 
         issue_id = item["issue_id"]
+        natural_language_action = _is_natural_language_action(action_name)
         _add_issue_label(issue_id, PENDING_COMMAND_LABEL)
-        comment_on_issue(issue_id, f"ACK comando `{action_name}`: procesando...")
+        if not natural_language_action:
+            comment_on_issue(issue_id, f"ACK comando `{action_name}`: procesando...")
 
         status = "done"
         result_payload: dict[str, Any] | None = None
         error_text: str | None = None
         try:
             result_payload = _run_action_with_timeout(issue_id=issue_id, action_name=action_name, params=params)
-            comment_on_issue(issue_id, f"✅ DONE `{action_name}`\n\n```json\n{json.dumps(result_payload, ensure_ascii=False)}\n```")
+            if natural_language_action:
+                reply_text = str((result_payload or {}).get("reply_markdown") or "").strip()
+                if not reply_text:
+                    reply_text = "Listo. Revise el issue y no encontre pendientes activos vinculados en el sistema."
+                comment_on_issue(issue_id, reply_text)
+            else:
+                comment_on_issue(issue_id, f"✅ DONE `{action_name}`\n\n```json\n{json.dumps(result_payload, ensure_ascii=False)}\n```")
             _set_issue_last_action_labels(issue_id, ok=True)
         except Exception as exc:  # pragma: no cover - defensive
             status = "error"
@@ -197,6 +209,10 @@ def _parse_command(raw: str | None) -> tuple[str, dict[str, str]] | None:
     text_value = _extract_command_text(raw)
     if not text_value:
         return None
+    return _parse_slash_command(text_value)
+
+
+def _parse_slash_command(text_value: str) -> tuple[str, dict[str, str]] | None:
     try:
         parts = shlex.split(text_value)
     except Exception:
@@ -221,6 +237,10 @@ def _parse_command(raw: str | None) -> tuple[str, dict[str, str]] | None:
     if not action_name:
         return None
     return action_name, params
+
+
+def _is_natural_language_action(_action_name: str) -> bool:
+    return False
 
 
 def _plane_pg_connect():
@@ -359,6 +379,20 @@ def _run_action_with_timeout(*, issue_id: str, action_name: str, params: dict[st
 
 
 def _execute_action(issue_id: str, action_name: str, params: dict[str, str]) -> dict[str, Any]:
+    if action_name == "info.issue_status":
+        issue = get_issue(issue_id)
+        issue_payload = issue.data if issue.ok and isinstance(issue.data, dict) else {}
+        linked = {"ok": False, "created": False}
+        if issue_payload:
+            with Session(engine) as session:
+                linked = ensure_plane_issue_task_link(session, issue=issue_payload)
+        reply = _build_issue_status_reply(
+            issue_id=issue_id,
+            issue=issue_payload,
+            link_result=linked,
+        )
+        return {"ok": True, "action": action_name, "reply_markdown": reply}
+
     if action_name == "enjambre.run":
         issue = get_issue(issue_id)
         title = f"Plane issue {issue_id}"
@@ -413,18 +447,24 @@ def _execute_action(issue_id: str, action_name: str, params: dict[str, str]) -> 
         return {"ok": True, "action": action_name, "result": result}
 
     if action_name == "traje.archivar":
+        if run_traje_operation is None:
+            raise RuntimeError("traje_module_unavailable")
         lote = max(1, min(int(params.get("lote", "30")), 200))
         dry_run = str(params.get("dryrun", "true")).strip().lower() in {"1", "true", "yes", "si"}
         result = run_traje_operation(operacion="archivar", lote=lote, dry_run=dry_run, trigger="plane_comment")
         return {"ok": True, "action": action_name, "result": result}
 
     if action_name == "traje.limpiar-low":
+        if run_traje_operation is None:
+            raise RuntimeError("traje_module_unavailable")
         lote = max(1, min(int(params.get("lote", "20")), 200))
         dry_run = str(params.get("dryrun", "false")).strip().lower() in {"1", "true", "yes", "si"}
         result = run_traje_operation(operacion="limpiar-low", lote=lote, dry_run=dry_run, trigger="plane_comment")
         return {"ok": True, "action": action_name, "result": result}
 
     if action_name == "traje.status":
+        if get_traje_status is None:
+            raise RuntimeError("traje_module_unavailable")
         return {"ok": True, "action": action_name, "result": get_traje_status()}
 
     if action_name == "sync.pull":
@@ -447,6 +487,127 @@ def _execute_action(issue_id: str, action_name: str, params: dict[str, str]) -> 
         }
 
     raise RuntimeError(f"unsupported_action:{action_name}")
+
+
+def _build_issue_status_reply(
+    *,
+    issue_id: str,
+    issue: dict[str, Any],
+    link_result: dict[str, Any] | None = None,
+) -> str:
+    issue_title = str(issue.get("name") or "").strip() or f"Issue {issue_id}"
+    issue_state = str((issue.get("state") or {}).get("name") or "sin estado").strip() or "sin estado"
+    issue_updated = str(issue.get("updated_at") or "").strip() or "sin fecha"
+    label_names = [str(item.get("name") or "").strip() for item in (issue.get("labels") or []) if str(item.get("name") or "").strip()]
+
+    linked_tasks = _find_linked_tasks(issue_id)
+    status_counts: dict[str, int] = {"queued": 0, "running": 0, "retrying": 0, "failed": 0, "done": 0}
+    for row in linked_tasks:
+        status = map_task_status(str(row.get("status") or ""))
+        status_counts[status] = status_counts.get(status, 0) + 1
+
+    pending_rows = [row for row in linked_tasks if map_task_status(str(row.get("status") or "")) != "done"]
+    lines: list[str] = [
+        f"Resumen rapido del issue **{issue_title}** (`{issue_id}`):",
+        "",
+        f"- Estado actual en Plane: **{issue_state}**",
+        f"- Ultima actualizacion detectada: `{issue_updated}`",
+    ]
+    if label_names:
+        lines.append(f"- Labels: {', '.join(label_names[:8])}")
+    else:
+        lines.append("- Labels: sin labels registradas")
+    if link_result and link_result.get("ok"):
+        task_id = str(link_result.get("task_id") or "").strip()
+        if link_result.get("created"):
+            lines.append(f"- Vinculo War Room: creado automaticamente (`{task_id[:8]}`)")
+        elif task_id:
+            lines.append(f"- Vinculo War Room: activo (`{task_id[:8]}`)")
+
+    if linked_tasks:
+        lines.append(
+            "- Tareas vinculadas en orquestador: "
+            f"{len(linked_tasks)} (done {status_counts.get('done', 0)}, "
+            f"running {status_counts.get('running', 0)}, "
+            f"retrying {status_counts.get('retrying', 0)}, "
+            f"queued {status_counts.get('queued', 0)}, "
+            f"failed {status_counts.get('failed', 0)})"
+        )
+    else:
+        lines.append("- Tareas vinculadas en orquestador: no encontradas")
+
+    if pending_rows:
+        lines.extend(["", "**Pendiente:**"])
+        for row in pending_rows[:5]:
+            task_title = str(row.get("title") or "sin titulo").strip()
+            task_id = str(row.get("task_id") or "").strip()
+            task_status = map_task_status(str(row.get("status") or ""))
+            lines.append(f"- [{task_status}] {task_title} (`{task_id[:8]}`)")
+    else:
+        lines.append("")
+        lines.append("**Pendiente:** no veo pendientes activos vinculados en este momento.")
+
+    return "\n".join(lines).strip()
+
+
+def _find_linked_tasks(issue_id: str) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    marker = f"[plane_issue_id={issue_id}]"
+    with Session(engine) as session:
+        try:
+            linked = session.connection().execute(
+                text(
+                    """
+                    SELECT t.id AS task_id, t.title, t.status, t.updated_at
+                    FROM plane_sync ps
+                    JOIN task t ON t.id = ps.task_id
+                    WHERE ps.plane_issue_id = :issue_id
+                    ORDER BY t.updated_at DESC
+                    LIMIT 30
+                    """
+                ),
+                {"issue_id": issue_id},
+            ).fetchall()
+            for item in linked:
+                payload = dict(item._mapping)
+                rows.append(
+                    {
+                        "task_id": str(payload.get("task_id") or ""),
+                        "title": str(payload.get("title") or ""),
+                        "status": str(payload.get("status") or ""),
+                    }
+                )
+        except Exception:
+            pass
+
+        if rows:
+            return rows
+
+        try:
+            fallback = session.connection().execute(
+                text(
+                    """
+                    SELECT id AS task_id, title, status, updated_at
+                    FROM task
+                    WHERE description LIKE :marker
+                    ORDER BY updated_at DESC
+                    LIMIT 30
+                    """
+                ),
+                {"marker": f"%{marker}%"},
+            ).fetchall()
+            for item in fallback:
+                payload = dict(item._mapping)
+                rows.append(
+                    {
+                        "task_id": str(payload.get("task_id") or ""),
+                        "title": str(payload.get("title") or ""),
+                        "status": str(payload.get("status") or ""),
+                    }
+                )
+        except Exception:
+            return rows
+    return rows
 
 
 def _add_issue_label(issue_id: str, label_name: str) -> None:
