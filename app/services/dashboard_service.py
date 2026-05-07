@@ -247,6 +247,57 @@ def _extract_message_text_from_event_payload(payload: dict[str, Any]) -> str | N
     return None
 
 
+def _extract_customer_name_from_event_payload(payload: dict[str, Any]) -> str | None:
+    keys = ("customer_name", "client_name", "name", "contact_name", "push_name", "profile_name")
+    for key in keys:
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    for key in ("message", "data", "event", "payload", "raw_payload"):
+        nested = payload.get(key)
+        if not isinstance(nested, dict):
+            continue
+        for field in keys:
+            nested_value = nested.get(field)
+            if isinstance(nested_value, str) and nested_value.strip():
+                return nested_value.strip()
+    return None
+
+
+def _extract_customer_name_from_context(context: dict[str, Any]) -> str | None:
+    if not isinstance(context, dict):
+        return None
+    for key in ("customer_name", "client_name", "name", "contact_name"):
+        value = context.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    profile = context.get("profile")
+    if isinstance(profile, dict):
+        for key in ("name", "display_name", "full_name"):
+            value = profile.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    return None
+
+
+def _parse_date_bound(raw_value: str | None, *, end_of_day: bool) -> datetime | None:
+    value = (raw_value or "").strip()
+    if not value:
+        return None
+    try:
+        if "T" in value:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00")).replace(tzinfo=None)
+        else:
+            parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    if "T" not in value:
+        if end_of_day:
+            return parsed.replace(hour=23, minute=59, second=59, microsecond=999999)
+        return parsed.replace(hour=0, minute=0, second=0, microsecond=0)
+    return parsed
+
+
 def _load_latest_event(session: Session) -> datetime | None:
     try:
         row = session.connection().execute(
@@ -637,6 +688,10 @@ def get_whatsapp_conversations(
     session: Session,
     *,
     q: str | None = None,
+    phone: str | None = None,
+    customer_name: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
     limit_clients: int = 20,
     limit_messages_per_client: int = 40,
 ) -> dict[str, Any]:
@@ -671,8 +726,21 @@ def get_whatsapp_conversations(
     parsed_events.sort(key=lambda item: _coerce_datetime(item.get("occurred_at")) or datetime.min)
 
     query = (q or "").strip().lower()
+    phone_query = (phone or "").strip().lower()
+    customer_name_query = (customer_name or "").strip().lower()
+    from_bound = _parse_date_bound(date_from, end_of_day=False)
+    to_bound = _parse_date_bound(date_to, end_of_day=True)
+    if from_bound and to_bound and from_bound > to_bound:
+        from_bound, to_bound = to_bound, from_bound
     grouped: dict[str, list[dict[str, Any]]] = {}
     for item in parsed_events:
+        item_dt = _coerce_datetime(item.get("occurred_at"))
+        if from_bound and (item_dt is None or item_dt < from_bound):
+            continue
+        if to_bound and (item_dt is None or item_dt > to_bound):
+            continue
+        if phone_query and phone_query not in str(item.get("client_key") or "").lower():
+            continue
         if query:
             hit_client = query in str(item.get("client_key") or "").lower()
             hit_text = query in str(item.get("text") or "").lower()
@@ -686,9 +754,21 @@ def get_whatsapp_conversations(
         recent_items = items[-safe_limit_messages:]
         latest_ts = _coerce_datetime(recent_items[-1].get("occurred_at")) if recent_items else None
         context = memory_service.get_context(client_key=client_key, channel="whatsapp") or {}
+        payload_name = ""
+        for msg in reversed(recent_items):
+            payload_name = _extract_customer_name_from_event_payload(msg.get("payload") or {}) or ""
+            if payload_name:
+                break
+        context_name = _extract_customer_name_from_context(context) or ""
+        resolved_name = (context_name or payload_name).strip()
+        if customer_name_query:
+            haystack = f"{resolved_name} {client_key}".lower()
+            if customer_name_query not in haystack:
+                continue
         conversations.append(
             {
                 "client_key": client_key,
+                "customer_name": resolved_name or None,
                 "last_event_at": latest_ts,
                 "message_count": len(recent_items),
                 "messages": recent_items,
@@ -703,6 +783,10 @@ def get_whatsapp_conversations(
     return {
         "generated_at": datetime.utcnow(),
         "q": q or "",
+        "phone": phone or "",
+        "customer_name": customer_name or "",
+        "date_from": date_from or "",
+        "date_to": date_to or "",
         "total_clients": len(limited),
         "total_messages": total_messages,
         "items": limited,

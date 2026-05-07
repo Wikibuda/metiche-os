@@ -193,7 +193,7 @@
       font-size: 12px;
     }
     .conversation-section { margin-top: 12px; }
-    .conversation-controls { display: grid; grid-template-columns: 1fr 120px; gap: 8px; margin-bottom: 8px; }
+    .conversation-controls { display: grid; grid-template-columns: 1.2fr 1fr 1fr 0.8fr 0.8fr 120px 140px; gap: 8px; margin-bottom: 8px; }
     .conversation-item {
       border: 1px solid var(--border);
       border-radius: 8px;
@@ -462,7 +462,12 @@
           <h2>Conversaciones WhatsApp (Masa Madre)</h2>
           <div class="conversation-controls">
             <input id="conv-search" placeholder="Buscar por client_key o texto" />
+            <input id="conv-phone" placeholder="Telefono (ej. +521...)" />
+            <input id="conv-customer-name" placeholder="Nombre cliente (si existe)" />
+            <input id="conv-date-from" type="date" title="Fecha desde" />
+            <input id="conv-date-to" type="date" title="Fecha hasta" />
             <button id="conv-search-btn" class="secondary">Buscar</button>
+            <button id="conv-clear-btn" class="secondary">Limpiar filtros</button>
           </div>
           <div class="small" id="conv-meta">Cargando conversaciones...</div>
           <div id="conv-list"></div>
@@ -823,7 +828,13 @@
         return;
       }
       host.innerHTML = items.map((conv) => {
-        const messages = Array.isArray(conv.messages) ? conv.messages : [];
+        const messages = Array.isArray(conv.messages)
+          ? [...conv.messages].sort((a, b) => {
+              const aTs = Date.parse(a?.occurred_at || "") || 0;
+              const bTs = Date.parse(b?.occurred_at || "") || 0;
+              return bTs - aTs;
+            })
+          : [];
         const lines = messages.map((msg) => {
           const isInbound = msg.direction === "inbound";
           const cls = isInbound ? "chat-in" : "chat-out";
@@ -839,10 +850,11 @@
         }).join("");
         const safeClient = escapeHtml(conv.client_key || "-");
         const contextPayload = JSON.stringify(conv.context || {}, null, 2);
+        const customerLabel = escapeHtml(conv.customer_name || "");
         return `
           <div class="conversation-item">
             <div class="conversation-head">
-              <div><strong>${safeClient}</strong></div>
+              <div><strong>${safeClient}</strong>${customerLabel ? ` · ${customerLabel}` : ""}</div>
               <div class="small">${messages.length} evento(s) · ${fmtDate(conv.last_event_at)}</div>
             </div>
             <div class="conversation-messages">${lines || '<div class="small">Sin eventos.</div>'}</div>
@@ -930,9 +942,17 @@
     async function refreshConversations() {
       const params = new URLSearchParams();
       const query = qs("conv-search").value.trim();
+      const phone = qs("conv-phone").value.trim();
+      const customerName = qs("conv-customer-name").value.trim();
+      const dateFrom = qs("conv-date-from").value.trim();
+      const dateTo = qs("conv-date-to").value.trim();
       if (query) params.set("q", query);
-      params.set("limit_clients", "20");
-      params.set("limit_messages", "60");
+      if (phone) params.set("phone", phone);
+      if (customerName) params.set("customer_name", customerName);
+      if (dateFrom) params.set("date_from", dateFrom);
+      if (dateTo) params.set("date_to", dateTo);
+      params.set("limit_clients", "100");
+      params.set("limit_messages", "200");
       try {
         const response = await fetchJson(`/dashboard/conversations?${params.toString()}`);
         state.conversations = response.items || [];
@@ -942,6 +962,20 @@
         qs("conv-meta").textContent = "No se pudieron cargar conversaciones.";
         qs("conv-list").innerHTML = '<div class="small">Error consultando conversaciones.</div>';
       }
+    }
+
+    async function clearConversationFilters() {
+      qs("conv-search").value = "";
+      qs("conv-phone").value = "";
+      qs("conv-customer-name").value = "";
+      qs("conv-date-from").value = "";
+      qs("conv-date-to").value = "";
+      await refreshConversations();
+    }
+
+    function isConversationFilterField(element) {
+      if (!element || typeof element.id !== "string") return false;
+      return ["conv-search", "conv-phone", "conv-customer-name", "conv-date-from", "conv-date-to"].includes(element.id);
     }
 
     async function submitMemory(event) {
@@ -1147,9 +1181,17 @@
           (() => {
             const params = new URLSearchParams();
             const query = qs("conv-search").value.trim();
+            const phone = qs("conv-phone").value.trim();
+            const customerName = qs("conv-customer-name").value.trim();
+            const dateFrom = qs("conv-date-from").value.trim();
+            const dateTo = qs("conv-date-to").value.trim();
             if (query) params.set("q", query);
-            params.set("limit_clients", "20");
-            params.set("limit_messages", "60");
+            if (phone) params.set("phone", phone);
+            if (customerName) params.set("customer_name", customerName);
+            if (dateFrom) params.set("date_from", dateFrom);
+            if (dateTo) params.set("date_to", dateTo);
+            params.set("limit_clients", "100");
+            params.set("limit_messages", "200");
             return fetchJson(`/dashboard/conversations?${params.toString()}`);
           })()
         ]);
@@ -1197,11 +1239,21 @@
         qs(id).addEventListener("input", refreshAll);
       });
       qs("conv-search-btn").addEventListener("click", refreshConversations);
+      qs("conv-clear-btn").addEventListener("click", clearConversationFilters);
+      ["conv-phone", "conv-customer-name", "conv-date-from", "conv-date-to"].forEach((id) => {
+        qs(id).addEventListener("change", refreshConversations);
+      });
       qs("conv-search").addEventListener("keydown", (event) => {
         if (event.key === "Enter") {
           event.preventDefault();
           refreshConversations();
         }
+      });
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape") return;
+        if (!isConversationFilterField(document.activeElement)) return;
+        event.preventDefault();
+        clearConversationFilters();
       });
       qs("detail-retry").addEventListener("click", async () => {
         if (!state.selectedTaskId) return;

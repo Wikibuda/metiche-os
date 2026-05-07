@@ -182,6 +182,10 @@ def get_dashboard_plane_issues_route(
 @router.get("/conversations")
 def get_dashboard_conversations_route(
     q: str | None = Query(default=None, description="Busqueda por client_key o texto"),
+    phone: str | None = Query(default=None, description="Filtro por telefono/client_key"),
+    customer_name: str | None = Query(default=None, description="Filtro por nombre de cliente"),
+    date_from: str | None = Query(default=None, description="Fecha inicial YYYY-MM-DD"),
+    date_to: str | None = Query(default=None, description="Fecha final YYYY-MM-DD"),
     limit_clients: int = Query(default=20, ge=1, le=100),
     limit_messages: int = Query(default=40, ge=1, le=200),
     session: Session = Depends(get_session),
@@ -189,6 +193,10 @@ def get_dashboard_conversations_route(
     return get_whatsapp_conversations(
         session,
         q=q,
+        phone=phone,
+        customer_name=customer_name,
+        date_from=date_from,
+        date_to=date_to,
         limit_clients=limit_clients,
         limit_messages_per_client=limit_messages,
     )
