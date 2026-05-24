@@ -26,20 +26,6 @@ El swarm 'WR:enviar mensaje a Gus' cerró ciclo 1 con decision reject. Votos acc
 
 Metiche recibió la misión enviar mensaje a Gus y la empujó por la ruta swarm_lane. La ejecución cerró con estado completed y la validación quedó en passed. Jefe, el laboratorio ya dejó memoria viva de este movimiento.
 
-### Swarm WR:Auditar conectividad del sistema ciclo 1: reject
-**Narrador:** metiche
-**Tipo:** chronicle
-**Asombro:** 5
-
-El swarm 'WR:Auditar conectividad del sistema' cerró ciclo 1 con decision reject. Votos accept=2, reject=2. Dispatch: telegram:fail,whatsapp:fail. Canales seleccionados: telegram, whatsapp. Canales omitidos: none.
-
-### Metiche movió la misión: Auditar conectividad del sistema
-**Narrador:** metiche
-**Tipo:** chronicle
-**Asombro:** 3
-
-Metiche recibió la misión Auditar conectividad del sistema y la empujó por la ruta swarm_lane. La ejecución cerró con estado completed y la validación quedó en passed. Jefe, el laboratorio ya dejó memoria viva de este movimiento.
-
 ### Metiche movió la misión: [Plane] Auditoria de completa  de indicadores financieros enel DashboardObjetico:
 **Narrador:** metiche
 **Tipo:** chronicle
