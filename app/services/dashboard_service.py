@@ -872,7 +872,7 @@ def run_quick_task(session: Session, *, channel: str, title: str, description: s
                     name=f"WR:{title[:60].strip()}",
                     goal=objective,
                     policy="narrative-consensus",
-                    agents=["whatsapp", "telegram", "deepseek", "plane"],
+                    agents=["deepseek", "plane", "dashboard"],
                 ),
             )
             run = run_swarm_cycle(
