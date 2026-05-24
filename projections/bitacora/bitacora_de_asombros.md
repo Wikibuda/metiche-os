@@ -4,13 +4,34 @@ _El libro vivo de Gus, Metiche y los enjambres._
 
 ## ✨ Último asombro
 
-### Swarm WR:enviar mensaje a Gus ciclo 1: reject
+### Metiche movió la misión: Prueba final conexión
 **Narrador:** metiche
-**Asombro:** 5
+**Asombro:** 3
 
-El swarm 'WR:enviar mensaje a Gus' cerró ciclo 1 con decision reject. Votos accept=2, reject=2. Dispatch: telegram:fail,whatsapp:fail. Canales seleccionados: telegram, whatsapp. Canales omitidos: none.
+Metiche recibió la misión Prueba final conexión y la empujó por la ruta swarm_lane. La ejecución cerró con estado completed y la validación quedó en passed. Jefe, el laboratorio ya dejó memoria viva de este movimiento.
 
 ## 🌅 Crónicas recientes
+
+### Metiche movió la misión: Prueba final conexión
+**Narrador:** metiche
+**Tipo:** chronicle
+**Asombro:** 3
+
+Metiche recibió la misión Prueba final conexión y la empujó por la ruta swarm_lane. La ejecución cerró con estado completed y la validación quedó en passed. Jefe, el laboratorio ya dejó memoria viva de este movimiento.
+
+### Metiche movió la misión: Test de conectividad
+**Narrador:** metiche
+**Tipo:** chronicle
+**Asombro:** 3
+
+Metiche recibió la misión Test de conectividad y la empujó por la ruta swarm_lane. La ejecución cerró con estado completed y la validación quedó en passed. Jefe, el laboratorio ya dejó memoria viva de este movimiento.
+
+### Metiche movió la misión: Verificar saldo DeepSeek
+**Narrador:** metiche
+**Tipo:** chronicle
+**Asombro:** 3
+
+Metiche recibió la misión Verificar saldo DeepSeek y la empujó por la ruta swarm_lane. La ejecución cerró con estado completed y la validación quedó en passed. Jefe, el laboratorio ya dejó memoria viva de este movimiento.
 
 ### Swarm WR:enviar mensaje a Gus ciclo 1: reject
 **Narrador:** metiche
