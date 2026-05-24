@@ -849,6 +849,8 @@ def get_plane_issues_section(session: Session, *, limit: int = 30) -> dict[str, 
 
 def run_quick_task(session: Session, *, channel: str, title: str, description: str | None, launch_swarm: bool) -> dict[str, Any]:
     from app.domain.tasks.models import TaskRunCreate
+    from app.domain.swarm.models import SwarmCreate, SwarmRunCreate
+    from app.domain.swarm.service import create_swarm, run_swarm_cycle
 
     channel_value = map_task_channel(channel)
     task_type = "enjambre" if launch_swarm else channel_value
@@ -860,6 +862,41 @@ def run_quick_task(session: Session, *, channel: str, title: str, description: s
         requested_by="dashboard-operativo",
     )
     flow = run_task_flow(session, payload)
+
+    if launch_swarm:
+        objective = description or title
+        try:
+            swarm = create_swarm(
+                session,
+                SwarmCreate(
+                    name=f"WR:{title[:60].strip()}",
+                    goal=objective,
+                    policy="narrative-consensus",
+                    agents=["whatsapp", "telegram", "deepseek", "plane"],
+                ),
+            )
+            run = run_swarm_cycle(
+                session,
+                swarm.id,
+                SwarmRunCreate(
+                    objective=objective,
+                    related_task_id=flow.task.id,
+                    client_key=f"dashboard:{flow.task.id}",
+                    max_cycles=1,
+                ),
+            )
+            return {
+                **flow.model_dump(),
+                "swarm_id": swarm.id,
+                "swarm_decision": run.decision if run else None,
+                "swarm_status": swarm.status,
+            }
+        except Exception as exc:
+            return {
+                **flow.model_dump(),
+                "swarm_error": str(exc),
+            }
+
     return flow.model_dump()
 
 
