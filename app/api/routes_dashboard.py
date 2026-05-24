@@ -1,12 +1,19 @@
 from datetime import datetime
 from pathlib import Path
 
+from datetime import datetime
+from pathlib import Path
+from uuid import uuid4
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlmodel import Session
 
 from app.core.db import get_session
+from app.domain.swarm.models import SwarmCreate
+from app.domain.swarm.service import create_swarm
+from app.domain.tasks.models import TaskEnqueueCreate
 from app.services.dashboard_service import (
     get_channel_events,
     get_channels_status,
@@ -20,14 +27,20 @@ from app.services.dashboard_service import (
     perform_task_action,
     run_quick_task,
 )
+from app.services.fifo_queue import (
+    can_enqueue,
+    enqueue_fifo as fifo_enqueue,
+    get_queue_full,
+    process_next as fifo_process_next,
+    get_queue_length,
+    PRIORITY_LEVELS,
+)
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 _ROOT_DIR = Path(__file__).resolve().parents[2]
 _OPERATIVO_HTML = _ROOT_DIR / "dashboard" / "operativo.html"
 _ADMIN_DASHBOARD_HTML = _ROOT_DIR / "dashboard" / "admin-dashboard-lab.html"
 _TRAJE_IRON_MAN_HTML = _ROOT_DIR / "dashboard" / "traje-iron-man.html"
-
-
 class QuickTaskRequest(BaseModel):
     channel: str
     title: str
@@ -38,6 +51,25 @@ class QuickTaskRequest(BaseModel):
 class TaskActionRequest(BaseModel):
     action: str
     priority: str | None = None
+
+
+class CreateIssueRequest(BaseModel):
+    title: str
+    description: str | None = None
+    priority: str = "high"
+    launch_swarm: bool = False
+
+
+class RunSwarmRequest(BaseModel):
+    title: str
+    goal: str
+
+
+class FIFOEnqueueRequest(BaseModel):
+    title: str
+    description: str | None = None
+    priority: str = "medium"
+    task_type: str = "operational"
 
 
 @router.get("/operativo")
@@ -200,3 +232,203 @@ def get_dashboard_conversations_route(
         limit_clients=limit_clients,
         limit_messages_per_client=limit_messages,
     )
+
+
+# ── FIFO Queue Endpoints ────────────────────────────────────────────────
+
+
+@router.get("/fifo-queue")
+def get_fifo_queue_route(session: Session = Depends(get_session)) -> dict:
+    """
+    Retorna el estado completo de la cola FIFO:
+    total, lengths (por nivel), grouped (entries agrupadas por nivel).
+    """
+    return get_queue_full(session)
+
+
+@router.get("/fifo-queue/lengths")
+def get_fifo_queue_lengths_route(
+    priority: str | None = Query(default=None, description="Filtrar por nivel"),
+    session: Session = Depends(get_session),
+) -> dict:
+    """Retorna las longitudes de la cola por nivel de prioridad."""
+    if priority and not can_enqueue(session, priority):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Prioridad invalida. Valores: {', '.join(PRIORITY_LEVELS)}",
+        )
+    return {"generated_at": datetime.utcnow(), "lengths": get_queue_length(session, priority)}
+
+
+@router.post("/fifo-queue/enqueue")
+def fifo_enqueue_route(
+    payload: FIFOEnqueueRequest,
+    session: Session = Depends(get_session),
+) -> dict:
+    """
+    Encola una tarea en la cola FIFO con la prioridad indicada.
+    """
+    if not payload.title.strip():
+        raise HTTPException(status_code=400, detail="El titulo es obligatorio")
+
+    try:
+        task_payload = TaskEnqueueCreate(
+            title=payload.title.strip(),
+            description=payload.description,
+            priority=payload.priority,
+            task_type=payload.task_type,
+        )
+        entry = fifo_enqueue(session, task_payload, priority=payload.priority)
+        return {
+            "ok": True,
+            "queue_entry": entry.model_dump(),
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/fifo-queue/process-next")
+def fifo_process_next_route(session: Session = Depends(get_session)) -> dict:
+    """
+    Extrae la siguiente tarea de la cola (por orden de prioridad) y la procesa.
+    Retorna la tarea o un mensaje de cola vacia.
+    """
+    result = fifo_process_next(session)
+    if result is None:
+        return {"ok": False, "message": "La cola esta vacia"}
+    return {"ok": True, **result}
+
+
+@router.post("/fifo-queue/clear")
+def fifo_clear_route(session: Session = Depends(get_session)) -> dict:
+    """
+    Cancela TODAS las tareas encoladas (limpia la cola).
+    """
+    from sqlalchemy import text as sql_text
+
+    now = datetime.utcnow()
+    conn = session.connection()
+    try:
+        conn.execute(
+            sql_text(
+                "UPDATE queueentry SET status = 'cancelled', completed_at = :now "
+                "WHERE status = 'queued'"
+            ),
+            {"now": now},
+        )
+        conn.execute(
+            sql_text(
+                "UPDATE task SET status = 'cancelled', updated_at = :now "
+                "WHERE status IN ('queued', 'new')"
+            ),
+            {"now": now},
+        )
+        session.commit()
+    except Exception as exc:
+        session.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al vaciar cola: {exc}") from exc
+
+    return {"ok": True, "message": "Cola vaciada", "cleared_at": now.isoformat()}
+
+
+# ── Plane Actions Endpoints ─────────────────────────────────────────────
+
+
+@router.post("/create-issue")
+def create_issue_route(
+    payload: CreateIssueRequest,
+    session: Session = Depends(get_session),
+) -> dict:
+    """
+    Crea un issue en Plane (via la integracion) y opcionalmente
+    dispara un enjambre.
+    """
+    if not payload.title.strip():
+        raise HTTPException(status_code=400, detail="El titulo es obligatorio")
+
+    # Intentar crear el issue en Plane y/o encolar la tarea
+    issue_id = str(uuid4())[:13]
+    issue_url = None
+
+    try:
+        from app.integrations.plane import create_issue as plane_create_issue
+
+        labels = [f"priority:{payload.priority}"]
+        if payload.launch_swarm:
+            labels.append("run:enjambre")
+
+        description = payload.description or ""
+        if payload.launch_swarm:
+            description += "\n\n[auto: lanzar enjambre al procesar]"
+
+        plane_resp = plane_create_issue(
+            title=payload.title,
+            description_html=description,
+            labels=labels,
+        )
+        if plane_resp.ok:
+            if isinstance(plane_resp.data, dict):
+                issue_id = plane_resp.data.get("id") or plane_resp.data.get("identifier") or issue_id
+                issue_url = plane_resp.data.get("url") or None
+    except Exception:
+        # Fallback: encolar como tarea local si Plane falla
+        pass
+
+    # Encolar como tarea local
+    task_type = "enjambre" if payload.launch_swarm else "operational"
+    try:
+        task_payload = TaskEnqueueCreate(
+            title=payload.title.strip(),
+            description=payload.description,
+            priority=payload.priority,
+            task_type=task_type,
+        )
+        entry = fifo_enqueue(session, task_payload, priority=payload.priority)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return {
+        "ok": True,
+        "issue_id": issue_id,
+        "issue_url": issue_url,
+        "queue_entry": entry.model_dump(),
+        "launch_swarm": payload.launch_swarm,
+    }
+
+
+@router.post("/run-swarm")
+def run_swarm_route(
+    payload: RunSwarmRequest,
+    session: Session = Depends(get_session),
+) -> dict:
+    """
+    Crea y lanza un enjambre (swarm) desde el Dashboard.
+    """
+    if not payload.title.strip():
+        raise HTTPException(status_code=400, detail="El titulo es obligatorio")
+    if not payload.goal.strip():
+        raise HTTPException(status_code=400, detail="El objetivo del enjambre es obligatorio")
+
+    try:
+        swarm_payload = SwarmCreate(
+            name=payload.title.strip(),
+            goal=payload.goal.strip(),
+            policy="narrative-consensus",
+            agents=["whatsapp", "telegram", "deepseek"],
+        )
+        swarm = create_swarm(session, swarm_payload)
+        return {
+            "ok": True,
+            "swarm_id": swarm.id,
+            "swarm_name": swarm.name,
+            "goal": swarm.goal,
+            "status": swarm.status,
+            "agents": [agent.agent_name for agent in swarm.agents],
+        }
+    except ValueError as exc:
+        detail = str(exc)
+        if detail == "invalid_policy":
+            raise HTTPException(status_code=400, detail="Policy no valida") from exc
+        if detail == "empty_agents":
+            raise HTTPException(status_code=400, detail="Debe incluir al menos un agente") from exc
+        raise HTTPException(status_code=400, detail=f"Error al crear enjambre: {detail}") from exc

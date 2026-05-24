@@ -6,7 +6,20 @@ from sqlmodel import Field, SQLModel
 
 
 ALLOWED_POLICIES = {"majority", "leader-follower", "narrative-consensus"}
-ALLOWED_AGENTS = {"whatsapp", "telegram", "shopify", "plane", "dashboard", "deepseek"}
+ALLOWED_AGENTS = {
+    "whatsapp", "telegram", "shopify", "plane", "dashboard", "deepseek",
+    "audio_analyzer", "entity_extractor", "segmenter", "recommender",
+    "executor", "notifier",
+}
+
+ALLOWED_TASK_TYPES = {
+    "send_message",
+    "data_query",
+    "batch_sql",
+    "code_execution",
+    "narrative",
+    "enjambre",
+}
 ALLOWED_SWARM_STATUS = {"created", "running", "paused", "completed", "failed", "cancelled"}
 
 

@@ -15,6 +15,8 @@ class Task(SQLModel, table=True):
     execution_mode: str = Field(default="queued")
     task_type: str = Field(default="planning")
     status: str = Field(default="new")
+    priority: str = Field(default="medium")  # 6 niveles: en_progreso, blocking, urgent, high, medium, low
+    queue_position: Optional[int] = Field(default=None)  # auto-increment por nivel
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -24,6 +26,8 @@ class TaskCreate(BaseModel):
     description: str | None = None
     execution_mode: str = "queued"
     task_type: str = "planning"
+    priority: str = "medium"
+    queue_position: int | None = None
 
 
 class TaskRead(BaseModel):
@@ -33,12 +37,26 @@ class TaskRead(BaseModel):
     execution_mode: str
     task_type: str
     status: str
+    priority: str = "medium"
+    queue_position: int | None = None
     created_at: datetime
     updated_at: datetime
 
     @classmethod
     def from_model(cls, task: Task) -> "TaskRead":
-        return cls.model_validate(task, from_attributes=True)
+        data = {
+            "id": task.id,
+            "title": task.title,
+            "description": task.description,
+            "execution_mode": task.execution_mode,
+            "task_type": task.task_type,
+            "status": task.status,
+            "priority": task.priority or "medium",
+            "queue_position": task.queue_position,
+            "created_at": task.created_at,
+            "updated_at": task.updated_at,
+        }
+        return cls.model_validate(data)
 
 
 
@@ -77,6 +95,7 @@ class TaskRunCreate(BaseModel):
     description: str | None = None
     execution_mode: str = "queued"
     task_type: str = "operational"
+    priority: str = "medium"
     requested_by: str = "gus"
 
 

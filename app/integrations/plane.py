@@ -454,9 +454,10 @@ def _list_issues_direct(*, limit: int = 50, labels: list[str] | None = None) -> 
             cur = conn.cursor()
             cur.execute(
                 """
-                SELECT i.id::text, i.name, i.description_html, i.updated_at::text, COALESCE(s.name, '') AS state_name
+                SELECT i.id::text, i.name, i.description_html, i.updated_at::text, COALESCE(s.name, '') AS state_name, COALESCE(u.email, '') AS created_by
                 FROM issues i
                 LEFT JOIN states s ON s.id = i.state_id
+                LEFT JOIN users u ON u.id = i.created_by_id
                 WHERE i.deleted_at IS NULL
                 ORDER BY i.updated_at DESC
                 LIMIT %s
@@ -490,6 +491,7 @@ def _list_issues_direct(*, limit: int = 50, labels: list[str] | None = None) -> 
                         "description_html": str(row[2] or ""),
                         "updated_at": str(row[3] or ""),
                         "state": {"name": str(row[4] or "")},
+                        "created_by": str(row[5] or ""),
                         "labels": [{"name": name} for name in label_names],
                         "url": _issue_url_from_id(issue_id),
                     }

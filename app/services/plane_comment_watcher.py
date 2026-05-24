@@ -18,6 +18,7 @@ from sqlmodel import Session
 
 from app.core.config import settings
 from app.core.db import engine
+from app.core.roles import roles_config
 from app.domain.swarm.models import SwarmCreate, SwarmRunCreate
 from app.domain.swarm.service import create_swarm, run_swarm_cycle
 from app.integrations.plane import comment_on_issue, get_issue
@@ -114,11 +115,26 @@ def process_plane_comment_commands(*, limit: int = 20) -> dict[str, Any]:
             skipped += 1
             continue
 
+        # 🔍 Analizar el comentario: comando /metiche o auto-respuesta
         parsed = _parse_command(item.get("command_text"))
         if not parsed:
+            # Si es de un admin y NO es un comando → auto-respuesta con status
+            if roles_config.get_role(author) == "admin":
+                action_name = "info.issue_status"
+                params = {}
+            else:
+                skipped += 1
+                continue
+        else:
+            action_name, params = parsed
+
+        if not roles_config.can_execute(author, action_name):
+            comment_on_issue(
+                item["issue_id"],
+                f"⏳ {roles_config.owner_display}, no tienes permisos para ejecutar `{action_name}` en Metiche-OS. Solo Administradores pueden usar comandos.",
+            )
             skipped += 1
             continue
-        action_name, params = parsed
 
         with Session(engine) as session:
             ensure_plane_comment_tables(session)
@@ -239,8 +255,8 @@ def _parse_slash_command(text_value: str) -> tuple[str, dict[str, str]] | None:
     return action_name, params
 
 
-def _is_natural_language_action(_action_name: str) -> bool:
-    return False
+def _is_natural_language_action(action_name: str) -> bool:
+    return action_name in {"info.issue_status"}
 
 
 def _plane_pg_connect():

@@ -6,6 +6,25 @@
 ![Docker](https://img.shields.io/badge/docker-compose-2496ED?logo=docker&logoColor=white)
 ![Licencia](https://img.shields.io/badge/license-MIT-green)
 
+## © Metiche-OS
+
+**Metiche** es el nombre registrado del Sistema Operativo. No es configurable.
+- `owner_name`: configurable (default: "Gus")
+- `admin_ids`: configurable
+- `bot_name = "Metiche"` — **fijo, no cambia**
+
+## Sistema de Roles
+
+| Rol | Privilegios | Auto-ejecución |
+|-----|-------------|----------------|
+| Admin | Completo | ✅ (salvo encolar FIFO) |
+| Operator | Ejecución con aprobación | ❌ |
+| Viewer | Solo lectura | ❌ |
+
+Ver [docs/SISTEMA_ROLES.md](docs/SISTEMA_ROLES.md) para configuración.
+
+---
+
 Metiche-OS es una capa operativa sobre OpenClaw para ejecutar trabajo diario con trazabilidad real: recibe eventos (especialmente WhatsApp), decide rutas de ejecucion, coordina enjambres, sincroniza con Plane y expone un dashboard para operacion.
 
 ## Capacidades principales
