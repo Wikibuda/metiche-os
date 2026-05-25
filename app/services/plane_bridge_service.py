@@ -9,6 +9,7 @@ from sqlalchemy import text
 from sqlmodel import Session
 
 from app.core.config import settings
+from app.core.roles import roles_config
 from app.domain.swarm.models import SwarmCreate, SwarmRunCreate
 from app.domain.swarm.service import create_swarm, run_swarm_cycle
 from app.domain.tasks.models import Task
@@ -587,6 +588,20 @@ def process_plane_enjambre_pull(session: Session, *, limit: int = 20) -> dict[st
         link_result = ensure_plane_issue_task_link(session, issue=issue)
         related_task_id = str(link_result.get("task_id") or "").strip() if link_result.get("ok") else None
 
+        # NUEVO: Detección de roles
+        author_email = str(issue.get("created_by") or "").strip().lower()
+        issue_desc = str(issue.get("description_html") or "")
+        if not roles_config.can_execute(author_email, issue_desc):
+            # Viewer sin permisos
+            comment_on_issue(
+                issue_id,
+                f"⏳ {roles_config.owner_display}, este issue requiere aprobación de un Admin.",
+            )
+            _upsert_processed_issue(session, issue=issue, swarm_id=None, action="pending_approval")
+            skipped_count += 1
+            continue
+
+        # Admin: continuar con flujo normal
         try:
             swarm = create_swarm(
                 session,

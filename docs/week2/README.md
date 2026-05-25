@@ -71,3 +71,18 @@ Evidencia de ejecución:
 ## 6) Siguiente fase
 
 - Semana 3: dashboard de negocio en puerto separado y sin mezclar con la consola swarm.
+
+---
+
+## Sistema de Roles (Semana 3 / Fase 1)
+
+Se implementó el Sistema de Roles en `app/core/roles.py` con:
+- `admin_ids`: conjunto de emails con permisos completos.
+- Viewer: solo lectura, requiere aprobación de Admin.
+- Excepción: comandos `encolar` / `fifo` requieren revisión manual incluso para Admins.
+
+La integración cubre:
+- `plane_bridge_service.py` — issues `run:enjambre` requieren rol Admin.
+- `plane_comment_watcher.py` — comandos `/metiche` requieren rol Admin.
+
+Ver [docs/SISTEMA_ROLES.md](../SISTEMA_ROLES.md) para documentación completa.

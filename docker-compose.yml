@@ -36,6 +36,7 @@ services:
       - plane_selfhost
 
   worker:
+    restart: always
     build:
       context: .
       dockerfile: docker/app.Dockerfile

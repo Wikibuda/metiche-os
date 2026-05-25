@@ -1,0 +1,20 @@
+{
+  "last_operation": {
+    "operacion": "archivar",
+    "nombre_operacion": "Archivado automatico mensual (>15 dias)",
+    "trigger": "scheduler",
+    "dry_run": false,
+    "lote": 20,
+    "started_at": "2026-05-01T03:00:34.847574+00:00",
+    "candidatos_identificados": 0,
+    "lotes_procesados": 0,
+    "issues_actualizados": 0,
+    "errores": 0,
+    "validacion": null,
+    "finished_at": "2026-05-01T03:00:34.962143+00:00",
+    "duracion_segundos": 0.114569,
+    "ok": true,
+    "telegram_notified": true
+  },
+  "next_execution": "2026-06-01T03:00:00+00:00"
+}

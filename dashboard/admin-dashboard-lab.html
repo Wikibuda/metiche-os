@@ -621,6 +621,119 @@
         .hidden {
             display: none;
         }
+
+        /* ===== GASTOS (Expense Tracker) ===== */
+        .gastos-card {
+            background: rgba(30, 41, 59, 0.72);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+        .gastos-input-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .gastos-input-row .input {
+            flex: 1;
+            min-width: 260px;
+        }
+        .gastos-suma-total {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: #2dd36f;
+        }
+        .gastos-suma-label {
+            font-size: 0.95rem;
+            color: #94a3b8;
+        }
+        .gastos-tabla-wrap {
+            max-height: 320px;
+            overflow-y: auto;
+        }
+        .gastos-tabla-wrap table th {
+            position: sticky;
+            top: 0;
+            background: rgba(15, 23, 42, 0.95);
+        }
+        .gastos-cat-pill {
+            background: rgba(59, 130, 246, 0.15);
+            border-radius: 999px;
+            color: #bfdbfe;
+            display: inline-block;
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 3px 8px;
+        }
+        .gastos-cat-pill.insumos {
+            background: rgba(34, 197, 94, 0.18);
+            color: #bbf7d0;
+        }
+        .gastos-cat-pill.equipo {
+            background: rgba(245, 158, 11, 0.18);
+            color: #fde68a;
+        }
+        .gastos-cat-pill.operativos {
+            background: rgba(168, 85, 247, 0.18);
+            color: #e9d5ff;
+        }
+        .gastos-delete-btn {
+            background: transparent;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 8px;
+            color: #fecaca;
+            cursor: pointer;
+            font-size: 0.8rem;
+            padding: 4px 8px;
+            transition: 0.15s;
+        }
+        .gastos-delete-btn:hover {
+            background: rgba(239, 68, 68, 0.2);
+            border-color: rgba(239, 68, 68, 0.6);
+        }
+        .gastos-resumen {
+            display: grid;
+            gap: 10px;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            margin-top: 14px;
+        }
+        .gastos-resumen-item {
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 12px;
+            padding: 12px;
+        }
+        .gastos-resumen-valor {
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
+        .gastos-resumen-label {
+            color: #94a3b8;
+            font-size: 0.8rem;
+            margin-top: 2px;
+        }
+        .gastos-empty {
+            color: #64748b;
+            font-style: italic;
+            padding: 20px;
+            text-align: center;
+        }
+        .gastos-auto-info {
+            color: #64748b;
+            font-size: 0.8rem;
+            margin-top: 4px;
+        }
+        .gastos-hint {
+            color: #94a3b8;
+            font-size: 0.85rem;
+            margin-bottom: 12px;
+        }
+        .gastos-hint code {
+            background: rgba(59, 130, 246, 0.12);
+            border-radius: 4px;
+            color: #bfdbfe;
+            padding: 2px 6px;
+        }
     </style>
 </head>
 <body>
@@ -866,6 +979,57 @@
                     <div class="alert hidden" id="swarm-history-alert"></div>
                     <div class="meta" id="swarm-history-meta">Selecciona un enjambre para cargar su historial completo.</div>
                     <pre class="code-block" id="swarm-history-json">Sin historial cargado.</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== GASTOS (Expense Tracker) ===== -->
+        <section class="panel" id="gastos-panel">
+            <h2>💰 Gastos · Materias Primas, Equipo y Operativos</h2>
+            <div class="gastos-hint">
+                Escribe natural, el sistema detecta el monto automáticamente. Ej: <code>360g de mantequilla $120</code>, <code>4 barras de mantequilla $120</code>, <code>Garantía extendida de batidora $250</code>, <code>10kg de harina de fuerza $210</code>
+            </div>
+            <div class="gastos-input-row">
+                <input class="input" id="gasto-input" placeholder="Ej: 10kg de harina de fuerza $210" autocomplete="off" />
+                <button class="btn" id="gasto-add-btn" type="button">➕ Agregar</button>
+                <button class="btn secondary" id="gasto-refresh-btn" type="button">🔄 Refrescar</button>
+                <span style="color: #94a3b8; font-size:0.85rem;" id="gasto-action-msg"></span>
+            </div>
+            <div class="gastos-auto-info" id="gasto-parse-preview"></div>
+
+            <div style="display: flex; flex-wrap: wrap; gap: 30px; align-items: baseline; margin: 16px 0 8px;">
+                <div>
+                    <div class="gastos-suma-label">🧾 GASTO TOTAL ACUMULADO</div>
+                    <div class="gastos-suma-total" id="gasto-total">$0</div>
+                </div>
+                <div>
+                    <div class="gastos-suma-label">Registros</div>
+                    <div style="font-size:1.6rem; font-weight:700;" id="gasto-count">0</div>
+                </div>
+                <div>
+                    <div class="gastos-suma-label">Promedio por gasto</div>
+                    <div style="font-size:1.2rem; font-weight:600;" id="gasto-promedio">$0</div>
+                </div>
+            </div>
+
+            <div class="gastos-resumen" id="gasto-categoria-resumen"></div>
+
+            <div style="margin-top: 16px;">
+                <div class="gastos-tabla-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Descripción</th>
+                                <th>Categoría</th>
+                                <th style="text-align:right;">Monto</th>
+                                <th style="width:50px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="gasto-rows">
+                            <tr><td colspan="5" class="gastos-empty">Cargando gastos…</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </section>
@@ -1651,6 +1815,205 @@
             } catch (error) {
                 setActionNote(`Error: ${error.message}`);
             }
+        });
+
+        // ========== GASTOS (Expense Tracker) ==========
+        function gastoParseMonto(raw) {
+            const match = raw.match(/\$(\d+(?:\.\d{1,2})?)/);
+            return match ? parseFloat(match[1]) : 0;
+        }
+
+        function gastoParseCategoria(desc) {
+            const lower = desc.toLowerCase();
+            const categorias = [
+                { keywords: ["harina", "mantequilla", "huevo", "azúcar", "azucar", "sal", "levadura", "aceite", "chocolate", "vainilla", "canela", "leche", "crema", "queso", "nata", "miel", "fermento", "masa madre", "semilla", "nuez", "almendra", "kg", "kilo", "gramo", "g ", "l ", "litro", "ml ", "bolsa", "caja", "paquete", "costal", "saco"], cat: "Insumos" },
+                { keywords: ["batidora", "refaccion", "refacción", "horno", "rodillo", "molde", "charola", "cuchara", "espátula", "espatula", "rasqueta", "termómetro", "termometro", "báscula", "bascula", "probeta", "tamiz", "rejilla", "laminadora", "sobadora", "amasadora", "garantía", "garantia", "repuesto"], cat: "Equipo" },
+                { keywords: ["gas", "luz", "agua", "internet", "renta", "sueldo", "salario", "nomina", "nómina", "honorarios", "transporte", "uber", "didi", "paquetería", "paqueteria", "envío", "envio", "flete"], cat: "Operativos" }
+            ];
+            for (const entry of categorias) {
+                if (entry.keywords.some(k => lower.includes(k))) {
+                    return entry.cat;
+                }
+            }
+            return "Varios";
+        }
+
+        function gastoCatClass(categoria) {
+            const c = String(categoria || "").toLowerCase();
+            if (c === "insumos") return "insumos";
+            if (c === "equipo") return "equipo";
+            if (c === "operativos") return "operativos";
+            return "";
+        }
+
+        function gastoFormatDate(isoDate) {
+            if (!isoDate) return "-";
+            const d = new Date(isoDate);
+            if (isNaN(d.getTime())) return isoDate.slice(0, 10);
+            return d.toLocaleDateString("es-MX", { month: "short", day: "numeric", year: "numeric" }) + 
+                   " " + d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+        }
+
+        function gastoUpdatePreview() {
+            const raw = document.getElementById("gasto-input").value.trim();
+            const preview = document.getElementById("gasto-parse-preview");
+            if (!raw) {
+                preview.textContent = "";
+                return;
+            }
+            const monto = gastoParseMonto(raw);
+            const desc = raw.replace(/\$\d+(\.\d{1,2})?\s*/g, "").trim() || raw;
+            const categoria = gastoParseCategoria(desc);
+            if (monto > 0) {
+                preview.innerHTML = `🔍 Detectado: <strong>$${monto.toFixed(2)}</strong> para "${escapeHtml(desc)}" → <span class="gastos-cat-pill ${gastoCatClass(categoria)}">${categoria}</span>`;
+            } else {
+                preview.innerHTML = `<span style="color:#94a3b8;">ℹ️ No se detectó monto. Asegúrate de incluir <code>$</code> y el número. Ej: <code>harina $210</code></span>`;
+            }
+        }
+
+        async function gastoLoad() {
+            const msgEl = document.getElementById("gasto-action-msg");
+            try {
+                const data = await fetchJsonWithTimeout("/api/gastos", 5000);
+                const gastos = Array.isArray(data.gastos) ? data.gastos : [];
+                const total = Number(data.total || 0);
+                const count = Number(data.count || 0);
+
+                // Ordenar: más recientes primero
+                gastos.sort((a, b) => new Date(b.fecha || 0) - new Date(a.fecha || 0));
+
+                // Totales
+                document.getElementById("gasto-total").textContent = `$${total.toLocaleString("es-MX", { minimumFractionDigits: 2 })}`;
+                document.getElementById("gasto-count").textContent = count;
+                const promedio = count > 0 ? total / count : 0;
+                document.getElementById("gasto-promedio").textContent = `$${promedio.toLocaleString("es-MX", { minimumFractionDigits: 2 })}`;
+
+                // Resumen por categoría
+                const porCat = {};
+                gastos.forEach(g => {
+                    const cat = g.categoria || "Varios";
+                    porCat[cat] = (porCat[cat] || 0) + Number(g.monto || 0);
+                });
+                const resumenEl = document.getElementById("gasto-categoria-resumen");
+                resumenEl.innerHTML = Object.entries(porCat).map(([cat, suma]) => `
+                    <div class="gastos-resumen-item">
+                        <div class="gastos-resumen-valor">$${suma.toLocaleString("es-MX", { minimumFractionDigits: 2 })}</div>
+                        <div class="gastos-resumen-label"><span class="gastos-cat-pill ${gastoCatClass(cat)}">${escapeHtml(cat)}</span></div>
+                    </div>
+                `).join("");
+
+                // Tabla
+                const tbody = document.getElementById("gasto-rows");
+                if (!gastos.length) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="gastos-empty">No hay gastos registrados. ¡Agrega el primero!</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = gastos.map(g => {
+                    const catClass = gastoCatClass(g.categoria);
+                    const montoNum = Number(g.monto || 0);
+                    return `
+                        <tr>
+                            <td style="white-space:nowrap; font-size:0.85rem;">${gastoFormatDate(g.fecha)}</td>
+                            <td>${escapeHtml(g.descripcion || g.raw || "-")}</td>
+                            <td><span class="gastos-cat-pill ${catClass}">${escapeHtml(g.categoria || "Varios")}</span></td>
+                            <td style="text-align:right; font-weight:700;">$${montoNum.toFixed(2)}</td>
+                            <td><button class="gastos-delete-btn" data-gasto-id="${g.id}" type="button">✕</button></td>
+                        </tr>
+                    `;
+                }).join("");
+
+                msgEl.textContent = `Actualizado: ${new Date().toLocaleTimeString("es-MX")}`;
+            } catch (error) {
+                document.getElementById("gasto-rows").innerHTML = `<tr><td colspan="5" class="gastos-empty">Error al cargar: ${escapeHtml(error.message)}</td></tr>`;
+            }
+        }
+
+        async function gastoAdd() {
+            const input = document.getElementById("gasto-input");
+            const raw = input.value.trim();
+            const msgEl = document.getElementById("gasto-action-msg");
+            if (!raw) {
+                msgEl.textContent = "❌ Escribe algo primero";
+                return;
+            }
+            if (!raw.includes("$")) {
+                msgEl.textContent = "❌ Incluye el monto con $ (ej: harina $210)";
+                return;
+            }
+            const addBtn = document.getElementById("gasto-add-btn");
+            addBtn.disabled = true;
+            msgEl.textContent = "Guardando...";
+            try {
+                const resp = await fetchJsonWithTimeout("/api/gastos/add", 6000, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ descripcion: raw })
+                });
+                if (resp.ok) {
+                    msgEl.textContent = `✅ Agregado: $${Number(resp.gasto?.monto || 0).toFixed(2)} — ${escapeHtml(resp.gasto?.descripcion || "")}`;
+                    input.value = "";
+                    document.getElementById("gasto-parse-preview").textContent = "";
+                    await gastoLoad();
+                } else {
+                    msgEl.textContent = `❌ Error: ${escapeHtml(resp.error || "Desconocido")}`;
+                }
+            } catch (error) {
+                msgEl.textContent = `❌ Error de red: ${escapeHtml(error.message)}`;
+            } finally {
+                addBtn.disabled = false;
+                input.focus();
+            }
+        }
+
+        async function gastoDelete(gastoId) {
+            if (!gastoId) return;
+            const msgEl = document.getElementById("gasto-action-msg");
+            if (!confirm("¿Eliminar este gasto?")) return;
+            msgEl.textContent = "Eliminando...";
+            try {
+                const resp = await fetchJsonWithTimeout("/api/gastos/delete", 5000, {
+                    method: "DELETE",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ id: gastoId })
+                });
+                if (resp.ok) {
+                    msgEl.textContent = `🗑️ Gasto eliminado`;
+                    await gastoLoad();
+                } else {
+                    msgEl.textContent = `❌ Error: ${escapeHtml(resp.error || "Desconocido")}`;
+                }
+            } catch (error) {
+                msgEl.textContent = `❌ Error de red: ${escapeHtml(error.message)}`;
+            }
+        }
+
+        // Setup Gastos
+        document.addEventListener("DOMContentLoaded", () => {
+            gastoLoad();
+
+            document.getElementById("gasto-add-btn").addEventListener("click", gastoAdd);
+            document.getElementById("gasto-refresh-btn").addEventListener("click", gastoLoad);
+            document.getElementById("gasto-input").addEventListener("input", gastoUpdatePreview);
+            document.getElementById("gasto-input").addEventListener("keydown", (e) => {
+                if (e.key === "Enter") gastoAdd();
+            });
+
+            // Delegación para botones de eliminar
+            document.getElementById("gasto-rows").addEventListener("click", (e) => {
+                const target = e.target;
+                if (target.classList.contains("gastos-delete-btn")) {
+                    const id = target.dataset.gastoId;
+                    gastoDelete(id);
+                }
+            });
+
+            // Auto-refresh cada 30 segundos
+            setInterval(() => {
+                // Solo refrescar si el panel es visible
+                const panel = document.getElementById("gastos-panel");
+                const isVisible = panel && window.getComputedStyle(panel).display !== "none" && panel.offsetParent !== null;
+                if (isVisible) gastoLoad();
+            }, 30000);
         });
 
         window.addEventListener("beforeunload", () => {

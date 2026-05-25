@@ -461,21 +461,31 @@ def _dispatch_cycle_actions(
     agent_names = {agent.agent_name for agent in agents}
     dispatchable_channels = {"whatsapp", "telegram"}
     candidate_channels = sorted(dispatchable_channels.intersection(agent_names))
-    if not candidate_channels:
-        return results, {
-            "selected_channels": [],
-            "skipped_channels": [],
-            "reason": "no_dispatchable_channels",
-            "degraded_mode": False,
-            "health": {},
-            "hints": {},
-        }
+
+    # Mapeo de agentes internos a task_types del dispatcher
+    AGENT_TASK_MAP = {
+        "deepseek": "data_query",
+        "plane": "data_query",
+        "dashboard": "narrative",
+    }
+    internal_agents = sorted(agent_names & set(AGENT_TASK_MAP.keys()))
+
     client_key = (payload.client_key or "swarm-channel-demo").strip()
-    dispatch_policy = _select_dispatch_channels(session, candidate_channels, client_key)
-    for channel in dispatch_policy["selected_channels"]:
+    dispatch_policy: dict[str, Any] = {
+        "selected_channels": [],
+        "skipped_channels": [],
+        "reason": "no_dispatchable_channels",
+        "degraded_mode": False,
+        "health": {},
+        "hints": {},
+    }
+
+    # Despachar agentes internos (deepseek, plane, dashboard)
+    for agent_name in internal_agents:
+        task_type = AGENT_TASK_MAP[agent_name]
         task = UnifiedTask(
-            task_type="send_message",
-            channel=channel,
+            task_type=task_type,
+            channel=agent_name,
             client_key=client_key,
             message=objective,
             metadata={
@@ -483,17 +493,52 @@ def _dispatch_cycle_actions(
                 "cycle_id": cycle.id,
                 "cycle_number": cycle.cycle_number,
                 "policy": swarm.policy,
-                "dispatch_policy": dispatch_policy["reason"],
+                "agent": agent_name,
+                "objective": objective,
             },
         )
-        results[channel] = dispatch_unified_task(session, task)
+        results[agent_name] = dispatch_unified_task(session, task)
+
+    # Despachar canales externos (whatsapp, telegram)
+    if candidate_channels:
+        channel_policy = _select_dispatch_channels(session, candidate_channels, client_key)
+        dispatch_policy = channel_policy
+        for channel in channel_policy.get("selected_channels", []):
+            task = UnifiedTask(
+                task_type="send_message",
+                channel=channel,
+                client_key=client_key,
+                message=objective,
+                metadata={
+                    "swarm_id": swarm.id,
+                    "cycle_id": cycle.id,
+                    "cycle_number": cycle.cycle_number,
+                    "policy": swarm.policy,
+                    "dispatch_policy": channel_policy.get("reason", ""),
+                },
+            )
+            results[channel] = dispatch_unified_task(session, task)
+
+    dispatch_policy["internal_dispatched"] = internal_agents
     return results, dispatch_policy
 
 
 def _vote_from_dispatch(agent_name: str, result: DispatchResult) -> tuple[str, str]:
     if result.success:
-        return ("accept", f"{agent_name} envio mensaje correctamente y valida continuar el ciclo.")
-    return ("reject", f"{agent_name} no pudo enviar mensaje ({result.error or 'error_desconocido'}).")
+        if result.task_type == "data_query":
+            rows = result.details.get("rows", [])
+            total = result.details.get("total", 0)
+            return ("accept", f"{agent_name} consultó datos: {total} resultados.")
+        if result.task_type == "narrative":
+            entry_id = result.details.get("entry_id")
+            return ("accept", f"{agent_name} registró narrativa (entry={entry_id}).")
+        if result.task_type == "code_execution":
+            stdout = (result.details.get("stdout") or "")[:100]
+            return ("accept", f"{agent_name} ejecutó código: {stdout}")
+        return ("accept", f"{agent_name} completó tarea ({result.task_type}) exitosamente.")
+    if result.task_type == "send_message":
+        return ("reject", f"{agent_name} no pudo enviar mensaje ({result.error or 'error_desconocido'}).")
+    return ("reject", f"{agent_name} falló en {result.task_type}: {result.error or 'error_desconocido'}.")
 
 
 def _dispatch_summary(dispatch_results: dict[str, DispatchResult]) -> str:

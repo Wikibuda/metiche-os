@@ -23,6 +23,7 @@ const METICHE_TIMEOUT_MS = Number(process.env.METICHE_TIMEOUT_MS || 4500);
 // Archivos de datos para dashboards
 const SHOPIFY_SALES_FILE = path.join(OPENCLAW_ROOT, "workspace", "dashboard_parts", "shopify_today_simple.json");
 const DEEPSEEK_PRICING_FILE = path.join(OPENCLAW_ROOT, "workspace", "dashboard_parts", "deepseek_pricing.json");
+const GASTOS_FILE = path.join(OPENCLAW_ROOT, "workspace", "dashboard_parts", "gastos.json");
 
 const ACTIONS = {
   "prod-status": { cmd: "openclaw", args: ["daemon", "status"] },
@@ -987,6 +988,98 @@ const server = createServer(async (req, res) => {
         sendJson(res, 500, { ok: false, error: "No se pudo cargar el dashboard" });
         return;
       }
+    }
+
+    // ========== GASTOS (Expense Tracker) ==========
+    if (req.method === "GET" && requestUrl.pathname === "/api/gastos") {
+      try {
+        const data = await safeReadJson(GASTOS_FILE);
+        const gastos = Array.isArray(data?.gastos) ? data.gastos : [];
+        const total = gastos.reduce((sum, g) => sum + Number(g.monto || 0), 0);
+        sendJson(res, 200, { ok: true, gastos, total, count: gastos.length });
+      } catch (error) {
+        sendJson(res, 500, { ok: false, error: error.message });
+      }
+      return;
+    }
+
+    if (req.method === "POST" && requestUrl.pathname === "/api/gastos/add") {
+      try {
+        const body = await parseRequestBody(req);
+        const rawDesc = String(body.descripcion || "").trim();
+        if (!rawDesc) {
+          sendJson(res, 400, { ok: false, error: "La descripción es obligatoria" });
+          return;
+        }
+
+        // Auto-parse: extraer monto ($ seguido de número)
+        const montoMatch = rawDesc.match(/\$(\d+(?:\.\d{1,2})?)/);
+        const monto = montoMatch ? parseFloat(montoMatch[1]) : 0;
+        const descripcion = rawDesc.replace(/\$\d+(\.\d{1,2})?\s*/g, "").trim();
+
+        // Auto-categoría
+        const lower = descripcion.toLowerCase();
+        let categoria = "Varios";
+        const categorias = [
+          { keywords: ["harina", "mantequilla", "huevo", "azúcar", "azucar", "sal", "levadura", "aceite", "chocolate", "vainilla", "canela", "leche", "crema", "queso", "nata", "miel", "fermento", "masa madre", "semilla", "nuez", "almendra"], cat: "Insumos" },
+          { keywords: ["batidora", "refaccion", "refacción", "horno", "rodillo", "molde", "charola", "cuchara", "espátula", "espatula", "rasqueta", "termómetro", "termometro", "báscula", "bascula", "probeta", "tamiz", "colador", "rejilla", "laminadora", "sobadora", "amasadora", "garantía", "garantia", "repuesto"], cat: "Equipo" },
+          { keywords: ["kg", "kilo", "gramo", "g ", "l", "litro", "ml", "bolsa", "caja", "paquete", "envase", "costal", "saco"], cat: "Insumos" },
+          { keywords: ["gas", "luz", "agua", "internet", "renta", "sueldo", "salario", "nomina", "nómina", "honorarios", "transporte", "uber", "didi", "paquetería", "paqueteria", "envío", "envio"], cat: "Operativos" }
+        ];
+        for (const entry of categorias) {
+          if (entry.keywords.some(k => lower.includes(k))) {
+            categoria = entry.cat;
+            break;
+          }
+        }
+
+        // Leer datos existentes
+        const existing = await safeReadJson(GASTOS_FILE);
+        const gastos = Array.isArray(existing?.gastos) ? existing.gastos : [];
+        const nextId = gastos.reduce((max, g) => Math.max(max, Number(g.id || 0)), 0) + 1;
+
+        const nuevoGasto = {
+          id: nextId,
+          descripcion: descripcion || rawDesc.replace(/\$\d+(\.\d{1,2})?\s*/g, "").trim(),
+          monto: monto,
+          categoria: categoria,
+          raw: rawDesc,
+          fecha: new Date().toISOString()
+        };
+
+        gastos.push(nuevoGasto);
+        await fs.writeFile(GASTOS_FILE, JSON.stringify({ gastos }, null, 2), "utf-8");
+
+        const total = gastos.reduce((sum, g) => sum + Number(g.monto || 0), 0);
+        sendJson(res, 200, { ok: true, gasto: nuevoGasto, total, count: gastos.length });
+      } catch (error) {
+        sendJson(res, 500, { ok: false, error: error.message });
+      }
+      return;
+    }
+
+    if (req.method === "DELETE" && requestUrl.pathname === "/api/gastos/delete") {
+      try {
+        const body = await parseRequestBody(req);
+        const gastoId = Number(body.id);
+        if (!gastoId) {
+          sendJson(res, 400, { ok: false, error: "ID de gasto requerido" });
+          return;
+        }
+        const existing = await safeReadJson(GASTOS_FILE);
+        const gastos = Array.isArray(existing?.gastos) ? existing.gastos : [];
+        const filtered = gastos.filter(g => Number(g.id) !== gastoId);
+        if (filtered.length === gastos.length) {
+          sendJson(res, 404, { ok: false, error: "Gasto no encontrado" });
+          return;
+        }
+        await fs.writeFile(GASTOS_FILE, JSON.stringify({ gastos: filtered }, null, 2), "utf-8");
+        const total = filtered.reduce((sum, g) => sum + Number(g.monto || 0), 0);
+        sendJson(res, 200, { ok: true, total, count: filtered.length, deletedId: gastoId });
+      } catch (error) {
+        sendJson(res, 500, { ok: false, error: error.message });
+      }
+      return;
     }
 
     sendJson(res, 404, { ok: false, error: "Ruta no encontrada" });
