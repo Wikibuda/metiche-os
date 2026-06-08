@@ -43,6 +43,7 @@ def ensure_plane_bridge_tables(session: Session) -> None:
                 issue_title TEXT,
                 issue_state TEXT,
                 labels_json TEXT,
+                issue_signature TEXT,
                 issue_updated_at TEXT,
                 last_swarm_id TEXT,
                 last_action TEXT,
@@ -53,6 +54,12 @@ def ensure_plane_bridge_tables(session: Session) -> None:
             """
         )
     )
+    columns = {
+        str(row[1])
+        for row in session.connection().execute(text("PRAGMA table_info(plane_processed_issues)")).fetchall()
+    }
+    if "issue_signature" not in columns:
+        session.connection().execute(text("ALTER TABLE plane_processed_issues ADD COLUMN issue_signature TEXT"))
     session.commit()
 
 
@@ -133,6 +140,16 @@ def _strip_html(raw: str | None) -> str:
     text_only = re.sub(r"<[^>]+>", " ", source)
     compact = re.sub(r"\s+", " ", text_only).strip()
     return compact
+
+
+def _issue_signature(issue: dict[str, Any]) -> str:
+    payload = {
+        "title": str(issue.get("name") or issue.get("title") or "").strip(),
+        "objective": _strip_html(issue.get("description_html") or issue.get("description")),
+        "state": _issue_state_name(issue) or "",
+        "labels": sorted(_extract_label_names(issue)),
+    }
+    return json.dumps(payload, ensure_ascii=False, sort_keys=True)
 
 
 def _upsert_plane_sync(
@@ -451,7 +468,7 @@ def _processed_issue_row(session: Session, issue_id: str) -> dict[str, Any] | No
     row = session.connection().execute(
         text(
             """
-            SELECT issue_id, issue_updated_at, last_swarm_id, last_action
+            SELECT issue_id, issue_title, issue_state, labels_json, issue_signature, issue_updated_at, last_swarm_id, last_action
             FROM plane_processed_issues
             WHERE issue_id = :issue_id
             """
@@ -475,6 +492,7 @@ def _upsert_processed_issue(
     issue_title = str(issue.get("name") or issue.get("title") or "").strip()
     issue_state = _issue_state_name(issue) or ""
     labels_json = json.dumps(_extract_label_names(issue), ensure_ascii=False)
+    issue_signature = _issue_signature(issue)
     issue_updated = _issue_updated_at(issue)
     row = _processed_issue_row(session, issue_id)
 
@@ -487,6 +505,7 @@ def _upsert_processed_issue(
                     issue_title = :issue_title,
                     issue_state = :issue_state,
                     labels_json = :labels_json,
+                    issue_signature = :issue_signature,
                     issue_updated_at = :issue_updated_at,
                     last_swarm_id = :last_swarm_id,
                     last_action = :last_action,
@@ -501,6 +520,7 @@ def _upsert_processed_issue(
                 "issue_title": issue_title,
                 "issue_state": issue_state,
                 "labels_json": labels_json,
+                "issue_signature": issue_signature,
                 "issue_updated_at": issue_updated,
                 "last_swarm_id": swarm_id,
                 "last_action": action,
@@ -513,10 +533,10 @@ def _upsert_processed_issue(
             text(
                 """
                 INSERT INTO plane_processed_issues (
-                    issue_id, issue_url, issue_title, issue_state, labels_json, issue_updated_at,
+                    issue_id, issue_url, issue_title, issue_state, labels_json, issue_signature, issue_updated_at,
                     last_swarm_id, last_action, processed_at, created_at, updated_at
                 ) VALUES (
-                    :issue_id, :issue_url, :issue_title, :issue_state, :labels_json, :issue_updated_at,
+                    :issue_id, :issue_url, :issue_title, :issue_state, :labels_json, :issue_signature, :issue_updated_at,
                     :last_swarm_id, :last_action, :processed_at, :created_at, :updated_at
                 )
                 """
@@ -527,6 +547,7 @@ def _upsert_processed_issue(
                 "issue_title": issue_title,
                 "issue_state": issue_state,
                 "labels_json": labels_json,
+                "issue_signature": issue_signature,
                 "issue_updated_at": issue_updated,
                 "last_swarm_id": swarm_id,
                 "last_action": action,
@@ -542,12 +563,29 @@ def _should_process_issue(issue: dict[str, Any], processed: dict[str, Any] | Non
     updated_at = _issue_updated_at(issue)
     if not processed:
         return True
+    current_signature = _issue_signature(issue)
+    previous_signature = str(processed.get("issue_signature") or "").strip()
+    if previous_signature:
+        return current_signature != previous_signature
     last_action = str(processed.get("last_action") or "").strip().lower()
-    # Prevent infinite relaunch loops when Metiche itself updates the issue timestamp
-    # via comments/state transitions after launching a swarm.
-    if last_action == "swarm_launched":
+    previous_title = str(processed.get("issue_title") or "").strip()
+    previous_state = str(processed.get("issue_state") or "").strip()
+    previous_labels = _safe_json_loads(processed.get("labels_json"))
+    current_title = str(issue.get("name") or issue.get("title") or "").strip()
+    current_state = _issue_state_name(issue) or ""
+    current_labels = _extract_label_names(issue)
+    # Backward-compatibility for rows created before issue_signature existed.
+    # If title/state/labels remain equal, ignore pure updated_at changes caused by comments or metadata edits.
+    if (
+        previous_title == current_title
+        and previous_state == current_state
+        and isinstance(previous_labels, list)
+        and [str(item) for item in previous_labels] == current_labels
+    ):
         return False
     previous_updated = str(processed.get("issue_updated_at") or "")
+    if last_action == "swarm_launched" and updated_at == previous_updated:
+        return False
     return bool(updated_at and updated_at != previous_updated)
 
 
@@ -613,6 +651,14 @@ def process_plane_enjambre_pull(session: Session, *, limit: int = 20) -> dict[st
                     parent_issue_id=issue_id,
                 ),
             )
+            # Persist the issue signature as soon as the swarm exists so the next poll
+            # does not relaunch the same work while this run is still in flight.
+            _upsert_processed_issue(
+                session,
+                issue=issue,
+                swarm_id=swarm.id,
+                action="swarm_launching",
+            )
             run = run_swarm_cycle(
                 session,
                 swarm.id,
@@ -625,6 +671,19 @@ def process_plane_enjambre_pull(session: Session, *, limit: int = 20) -> dict[st
             )
             launched_count += 1
             processed_count += 1
+
+            # Actualizar status de task local de 'queued' → 'done'
+            if related_task_id:
+                try:
+                    task = session.get(Task, related_task_id)
+                    if task and task.status == "queued":
+                        task.status = "done"
+                        task.updated_at = datetime.utcnow()
+                        session.add(task)
+                        session.commit()
+                except Exception:
+                    pass  # no blocker si falla la actualización
+
             comment_on_issue(
                 issue_id,
                 (

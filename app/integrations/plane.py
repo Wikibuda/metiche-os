@@ -16,6 +16,7 @@ except Exception:  # pragma: no cover - optional dependency
     Json = None
 
 from app.core.config import settings
+from app.core.roles import roles_config
 
 
 @dataclass
@@ -198,6 +199,48 @@ def _resolve_state_id(conn, project_id: str, state_name: str | None) -> str | No
     return str(row[0]) if row else None
 
 
+def _candidate_issue_creator_emails() -> list[str]:
+    candidates: list[str] = []
+    raw_allowlist = str(settings.plane_command_author_allowlist or "").strip()
+    if raw_allowlist:
+        for item in raw_allowlist.split(","):
+            email = item.strip().lower()
+            if email and email not in candidates:
+                candidates.append(email)
+    for admin_email in roles_config.admin_ids:
+        email = str(admin_email or "").strip().lower()
+        if email and email not in candidates:
+            candidates.append(email)
+    return candidates
+
+
+def _resolve_issue_creator_id(conn) -> str | None:
+    cur = conn.cursor()
+    for email in _candidate_issue_creator_emails():
+        cur.execute(
+            """
+            SELECT id::text
+            FROM users
+            WHERE lower(email) = %s
+            LIMIT 1
+            """,
+            (email,),
+        )
+        row = cur.fetchone()
+        if row:
+            return str(row[0])
+    cur.execute(
+        """
+        SELECT id::text
+        FROM users
+        ORDER BY created_at ASC
+        LIMIT 1
+        """
+    )
+    row = cur.fetchone()
+    return str(row[0]) if row else None
+
+
 def _ensure_label(conn, *, label_name: str, project_id: str, workspace_id: str) -> str:
     cur = conn.cursor()
     cur.execute(
@@ -279,6 +322,7 @@ def _create_issue_direct(title: str, description: str, labels: list[str] | None 
             conn.autocommit = False
             project_id, workspace_id = _resolve_project_workspace(conn)
             state_id = _resolve_state_id(conn, project_id, "todo")
+            creator_user_id = _resolve_issue_creator_id(conn)
             cur = conn.cursor()
             cur.execute(
                 "SELECT COALESCE(MAX(sequence_id), 0) + 1 FROM issues WHERE project_id = %s::uuid",
@@ -290,10 +334,10 @@ def _create_issue_direct(title: str, description: str, labels: list[str] | None 
                 """
                 INSERT INTO issues (
                     created_at, updated_at, id, name, description, priority, sequence_id,
-                    project_id, state_id, workspace_id, description_html, sort_order, is_draft
+                    project_id, state_id, workspace_id, description_html, sort_order, is_draft, created_by_id
                 ) VALUES (
                     now(), now(), %s::uuid, %s, %s::jsonb, 'medium', %s,
-                    %s::uuid, %s::uuid, %s::uuid, %s, %s, false
+                    %s::uuid, %s::uuid, %s::uuid, %s, %s, false, %s::uuid
                 )
                 """,
                 (
@@ -306,6 +350,7 @@ def _create_issue_direct(title: str, description: str, labels: list[str] | None 
                     workspace_id,
                     description or "",
                     float(next_seq),
+                    creator_user_id,
                 ),
             )
 

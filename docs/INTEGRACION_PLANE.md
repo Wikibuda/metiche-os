@@ -65,10 +65,29 @@ curl -s "http://127.0.0.1:8091/dashboard/plane/issues?limit=30" | jq
 Flujo activo en worker:
 
 - El worker consulta issues con etiqueta configurable `PLANE_SYNC_PULL_LABEL` (default `run:enjambre`).
-- Por cada issue elegible, crea swarm y ejecuta un ciclo.
-- Publica comentario en el issue con el `swarm_id` y decision.
+- Por cada issue elegible, asegura primero el vinculo `issue <-> task local` mediante `ensure_plane_issue_task_link(...)`.
+- Esa task local funciona como recibo del bridge: nace en `queued` cuando el issue fue consumido por Metiche.
+- Despues crea el swarm y ejecuta el ciclo real de trabajo.
+- Cuando el bridge termina su procesamiento del issue, la task local pasa a `done`.
+- Publica comentario en el issue con el `swarm_id`, la decision y el resultado consolidado del enjambre.
 
 Adicionalmente, el worker de comentarios procesa comandos `/metiche ...` con allowlist de autor y registra idempotencia en `plane_processed_comments`.
+
+### Modelo canonico: Task != Swarm
+
+La separacion es intencional y debe mantenerse en codigo, dashboard y documentacion:
+
+- `Task.status=queued/done` significa "Plane ya fue recibido y procesado por el bridge".
+- `Swarm.status=pending/running/completed/failed` significa "estado real de ejecucion del enjambre".
+- Una `Task` en `done` no implica que el trabajo ya termino; solo implica que la integracion Plane -> War Room ya se proceso.
+- El War Room debe mostrar ambos estados sin mezclarlos para evitar falsos positivos de avance.
+
+En terminos operativos:
+
+- Plane define QUE hay que hacer.
+- La task local confirma que el bridge ya tomo ese pedido.
+- El swarm ejecuta el COMO y produce el resultado real.
+- Los comentarios de vuelta a Plane deben apoyarse en la salida del swarm, no en el mero cambio de `Task.status`.
 
 Etiquetas recomendadas al crear issue en Plane:
 
@@ -95,7 +114,24 @@ Metiche evita reprocesar issues de forma infinita con:
 
 Ademas, el vinculo tarea-issue se guarda en `plane_sync` para actualizar el mismo issue sin duplicarlo.
 
-## 5) Ejemplo practico completo
+Si un issue llega sin vinculo previo, el bridge debe crear automaticamente la task local y registrar la relacion para que el flujo bidireccional Plane <-> War Room no quede huerfano.
+
+## 5) Retorno al jefe y CHANNEL_TARGETS
+
+Cuando el swarm concluye:
+
+- Se construye un `compiled_message` con los hallazgos consolidados de los agentes internos.
+- Ese mensaje es la respuesta real del enjambre hacia afuera.
+- El routing de salida usa `CHANNEL_TARGETS` como decision arquitectonica estable.
+- El destino final puede ser distinto del `client_key` original si la politica del sistema exige centralizar la respuesta en el canal del jefe.
+
+Esto permite que el mismo flujo operativo:
+
+- deje trazabilidad en Plane,
+- mantenga observabilidad en War Room,
+- y entregue a Gus una salida consolidada y consistente.
+
+## 6) Ejemplo practico completo
 
 1. Crea issue en Plane con etiqueta `run:enjambre`.
 2. Espera al intervalo de `run-worker` (por defecto ~20s para watch).
@@ -108,7 +144,7 @@ curl -s "http://127.0.0.1:8091/dashboard/plane/issues?limit=30" | jq
 
 4. Abre el issue en Plane y revisa comentario automatico con resultado.
 
-## 6) Troubleshooting de integracion
+## 7) Troubleshooting de integracion
 
 ### No aparecen issues de Plane
 
@@ -122,12 +158,19 @@ curl -s "http://127.0.0.1:8091/dashboard/plane/issues?limit=30" | jq
 - Revisa logs del worker para `plane-watch lanzó enjambres`.
 - Verifica que el worker este corriendo continuamente.
 
+### El issue no muestra tareas vinculadas en orquestador
+
+- Verifica que el bridge este ejecutando `ensure_plane_issue_task_link(...)` al consumir el issue.
+- Revisa que exista registro en `plane_sync` para ese `issue_id`.
+- Confirma que la task local se haya creado aunque el issue venga directo desde Plane.
+- Recuerda: la vinculacion debe ser automatica; no debe depender de creacion manual previa en War Room.
+
 ### Errores de autenticacion API
 
 - Revisa `PLANE_API_KEY` y/o `PLANE_BEARER_TOKEN`.
 - Confirma `PLANE_WORKSPACE_SLUG` y `PLANE_PROJECT_ID`.
 
-## 7) Referencias cruzadas
+## 8) Referencias cruzadas
 
 - [README](../README.md)
 - [Operacion diaria](OPERACION.md)
