@@ -225,6 +225,7 @@ PYTHONPATH=. python scripts/channel_memory_api_smoke.py
 - [Guia de Integracion con Plane](docs/INTEGRACION_PLANE.md)
 - [Diagramas de Arquitectura y Flujos](docs/DIAGRAMAS.md)
 - [Rollout Operativo](docs/PLAN_ROLLOUT.md)
+- [Changelog](CHANGELOG.md)
 
 ## Estado del proyecto
 
