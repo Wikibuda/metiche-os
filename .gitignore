@@ -32,3 +32,5 @@ sessions/
 *.pem
 *.key
 openclaw.json.backup.context
+data/openclaw-autoreply-state.json
+projections/bitacora/bitacora_de_asombros.md
