@@ -499,22 +499,51 @@ def _dispatch_cycle_actions(
         )
         results[agent_name] = dispatch_unified_task(session, task)
 
+    # Compilar resultados de agentes internos para el mensaje de salida
+    report_lines: list[str] = [f"🤖 *Enjambre: {objective[:100]}*"]
+    for agent_name in internal_agents:
+        r = results.get(agent_name)
+        if r and r.success:
+            rows = r.details.get("rows", [])
+            if rows:
+                report_lines.append(f"\n📊 *{agent_name}*:")
+                for row in rows[:10]:
+                    items = " | ".join(f"{k}={v}" for k, v in row.items() if v and v != "ok")
+                    if items:
+                        report_lines.append(f"  • {items}")
+                    else:
+                        report_lines.append(f"  • {dict(row)}")
+            else:
+                report_lines.append(f"\n✅ *{agent_name}*: completado")
+        else:
+            reason = r.error if r else "no response"
+            report_lines.append(f"\n❌ *{agent_name}*: {reason}")
+
+    compiled_message = "\n".join(report_lines)
+
     # Despachar canales externos (whatsapp, telegram)
     if candidate_channels:
+        # Mapa de client_key real por canal (Gus = admin)
+        CHANNEL_TARGETS = {
+            "telegram": "1230372781",
+            "whatsapp": "+5218115007309",
+        }
         channel_policy = _select_dispatch_channels(session, candidate_channels, client_key)
         dispatch_policy = channel_policy
         for channel in channel_policy.get("selected_channels", []):
+            channel_client_key = CHANNEL_TARGETS.get(channel, client_key)
             task = UnifiedTask(
                 task_type="send_message",
                 channel=channel,
-                client_key=client_key,
-                message=objective,
+                client_key=channel_client_key,
+                message=compiled_message,
                 metadata={
                     "swarm_id": swarm.id,
                     "cycle_id": cycle.id,
                     "cycle_number": cycle.cycle_number,
                     "policy": swarm.policy,
                     "dispatch_policy": channel_policy.get("reason", ""),
+                    "compiled_from": internal_agents,
                 },
             )
             results[channel] = dispatch_unified_task(session, task)

@@ -5,7 +5,7 @@ from app.core.branding import BOT_NAME
 class RolesConfig:
     BOT_NAME = BOT_NAME
     owner_name: str = "Gus"
-    admin_ids: set[str] = {"gglunar@gmail.com", "gus@masamadremonterrey.com"}
+    admin_ids: set[str] = {"gglunar@gmail.com", "gus@masamadremonterrey.com", "metiche@masamadremonterrey.com"}
 
     @property
     def owner_display(self) -> str:
