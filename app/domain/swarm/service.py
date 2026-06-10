@@ -104,6 +104,9 @@ def run_swarm_cycle(session: Session, swarm_id: str, payload: SwarmRunCreate) ->
     rejected_votes = 0
     reject_streak = 0
     current_objective = payload.objective or swarm.goal
+    dispatch_results: dict[str, DispatchResult] = {}
+    dispatch_policy: dict[str, Any] = {}
+    cycle: SwarmCycle | None = None
 
     for _ in range(payload.max_cycles):
         cycle, votes, decision, accepted_votes, rejected_votes, dispatch_results, dispatch_policy = _execute_single_cycle(
@@ -166,6 +169,56 @@ def run_swarm_cycle(session: Session, swarm_id: str, payload: SwarmRunCreate) ->
     session.add(swarm)
     session.commit()
     session.refresh(swarm)
+
+    issue_id = str(swarm.parent_issue_id or "").strip()
+    if issue_id and cycle is not None:
+        try:
+            from app.services.plane_commenter import plane_issue_url, post_swarm_result_to_plane
+            from app.services.plane_notifier import notify_error, notify_issue_completed
+
+            dispatch_payload: dict[str, Any] = {
+                agent_name: {
+                    "success": result.success,
+                    "channel": result.channel,
+                    "task_type": result.task_type,
+                    "retry_count": result.retry_count,
+                    "final_status": result.final_status,
+                    "error": result.error,
+                    "details": result.details,
+                }
+                for agent_name, result in (dispatch_results or {}).items()
+            }
+            result_payload: dict[str, Any] = {
+                "swarm_id": swarm.id,
+                "swarm_name": swarm.name,
+                "objective": payload.objective or swarm.goal,
+                "decision": decision,
+                "accepted_votes": accepted_votes,
+                "rejected_votes": rejected_votes,
+                "cycles_executed": len(cycle_reads),
+                "stop_reason": stop_reason,
+                "cycle_outcome": cycle.outcome,
+                "dispatch_summary": _dispatch_summary(dispatch_results or {}),
+                "dispatch_policy": dispatch_policy,
+                "dispatch_results": dispatch_payload,
+            }
+
+            url = plane_issue_url(issue_id)
+            summary = f"Decisión: {decision} ({accepted_votes}/{rejected_votes})"
+            posted = post_swarm_result_to_plane(issue_id, result_payload)
+            if not posted:
+                notify_error(
+                    issue_id=issue_id,
+                    title=swarm.name,
+                    error_message=f"No pude postear el resultado del enjambre como comentario en Plane. {summary}",
+                    url=url,
+                )
+            elif decision == "accept":
+                notify_issue_completed(title=swarm.name, issue_id=issue_id, summary=summary, url=url)
+            else:
+                notify_error(issue_id=issue_id, title=swarm.name, error_message=summary, url=url)
+        except Exception:
+            pass
 
     return SwarmRunRead(
         swarm=SwarmRead.from_model(swarm, agents),
