@@ -6,7 +6,7 @@ import logging
 import re
 from collections import deque
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -34,11 +34,11 @@ def _parse_iso8601(value: str | None) -> datetime | None:
     except Exception:
         return None
     if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=UTC)
-    return parsed.astimezone(UTC)
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
-@dataclass(slots=True)
+@dataclass
 class SessionMatch:
     text: str
     session_file: str

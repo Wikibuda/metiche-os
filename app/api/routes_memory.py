@@ -1,4 +1,4 @@
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import uuid4
 
@@ -32,7 +32,7 @@ async def create_memory_entry(entry: MemoryEntry):
     """Registra una nueva entrada en el pool de memoria."""
     new_entry = entry.model_dump()
     new_entry["id"] = str(uuid4())
-    new_entry["created_at"] = datetime.now(UTC)
+    new_entry["created_at"] = datetime.now(timezone.utc)
     _memory_store.append(new_entry)
     return new_entry
 

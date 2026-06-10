@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlmodel import Session, select
@@ -28,7 +28,7 @@ class ChannelMemoryService:
                 ChannelMemory.channel == clean_channel,
             )
         ).first()
-        now = datetime.now(UTC)
+        now = datetime.now(timezone.utc)
         if existing:
             existing.context = context
             existing.updated_at = now

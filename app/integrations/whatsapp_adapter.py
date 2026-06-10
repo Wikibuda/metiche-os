@@ -6,7 +6,7 @@ import re
 import subprocess
 from pathlib import Path
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -70,7 +70,7 @@ class WhatsAppAdapter:
             updated_context = dict(loaded_context)
             updated_context["last_user_message"] = message.text
             updated_context["last_channel"] = "whatsapp"
-            updated_context["updated_at"] = datetime.now(UTC).isoformat()
+            updated_context["updated_at"] = datetime.now(timezone.utc).isoformat()
             self._save_context_to_api(client_key=client_key, context=updated_context)
             self._emit_task_event(
                 task_id=trace_task.id,
@@ -107,7 +107,7 @@ class WhatsAppAdapter:
             updated_context = dict(loaded_context)
             updated_context["last_outbound_message"] = message.text
             updated_context["last_channel"] = "whatsapp"
-            updated_context["updated_at"] = datetime.now(UTC).isoformat()
+            updated_context["updated_at"] = datetime.now(timezone.utc).isoformat()
             self._save_context_to_api(client_key=client_key, context=updated_context)
             self._emit_task_event(
                 task_id=trace_task.id,
@@ -334,7 +334,7 @@ class WhatsAppAdapter:
         ChannelMemoryService(self.session).save_context(client_key=client_key, channel="whatsapp", context=context)
 
     def _create_trace_task(self, *, client_key: str, message_text: str, direction: str = "inbound") -> Task:
-        now = datetime.now(UTC)
+        now = datetime.now(timezone.utc)
         task = Task(
             title=f"WhatsApp {direction} {client_key}",
             description=f"Adapter trace message ({direction}): {message_text}",
@@ -351,7 +351,7 @@ class WhatsAppAdapter:
 
     def _emit_task_event(self, *, task_id: str, event_type: str, summary: str, payload: dict[str, Any]) -> None:
         conn = self.session.connection()
-        now = datetime.now(UTC)
+        now = datetime.now(timezone.utc)
         try:
             conn.execute(
                 text(
@@ -385,6 +385,6 @@ class WhatsAppAdapter:
 
     def _set_task_status(self, *, task: Task, status: str) -> None:
         task.status = status
-        task.updated_at = datetime.now(UTC)
+        task.updated_at = datetime.now(timezone.utc)
         self.session.add(task)
         self.session.commit()

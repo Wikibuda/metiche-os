@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -123,7 +123,7 @@ def _extract_outbound_fields(raw_payload: dict[str, Any]) -> tuple[str | None, s
 
 
 def _emit_event(session: Session, *, task_id: str, event_type: str, summary: str, payload: dict[str, Any]) -> None:
-    now = datetime.now(UTC)
+    now = datetime.now(timezone.utc)
     session.connection().execute(
         text(
             """
@@ -165,7 +165,7 @@ def _append_conversation_message(
     memory_service = ChannelMemoryService(session)
     previous_context = memory_service.get_context(client_key=client_key, channel="whatsapp") or {}
     conversation = list(previous_context.get("conversation_history") or [])
-    now_iso = datetime.now(UTC).isoformat()
+    now_iso = datetime.now(timezone.utc).isoformat()
     conversation.append(
         {
             "ts": now_iso,
@@ -238,7 +238,7 @@ def openclaw_whatsapp_webhook(payload: dict[str, Any], session: Session = Depend
     task = session.get(Task, result.trace_task_id)
     if task is not None and task.status == "running":
         task.status = "done"
-        task.updated_at = datetime.now(UTC)
+        task.updated_at = datetime.now(timezone.utc)
         session.add(task)
         session.commit()
 

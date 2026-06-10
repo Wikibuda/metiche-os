@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
@@ -72,7 +72,7 @@ def get_channel_memory_context(
         client_key=client_key.strip(),
         channel=channel.strip().lower(),
         context=context,
-        retrieved_at=datetime.now(UTC),
+        retrieved_at=datetime.now(timezone.utc),
     )
 
 

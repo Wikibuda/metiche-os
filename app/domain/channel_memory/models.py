@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
@@ -16,5 +16,5 @@ class ChannelMemory(SQLModel, table=True):
     client_key: str = Field(index=True)
     channel: str = Field(index=True)
     context: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
