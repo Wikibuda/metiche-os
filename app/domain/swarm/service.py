@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from datetime import datetime, timedelta
 from typing import Any
@@ -467,6 +469,7 @@ def _dispatch_cycle_actions(
         "deepseek": "data_query",
         "plane": "data_query",
         "dashboard": "narrative",
+        "knowledge_agent": "semantic_search",
     }
     internal_agents = sorted(agent_names & set(AGENT_TASK_MAP.keys()))
 
@@ -504,17 +507,34 @@ def _dispatch_cycle_actions(
     for agent_name in internal_agents:
         r = results.get(agent_name)
         if r and r.success:
-            rows = r.details.get("rows", [])
-            if rows:
-                report_lines.append(f"\n📊 *{agent_name}*:")
-                for row in rows[:10]:
-                    items = " | ".join(f"{k}={v}" for k, v in row.items() if v and v != "ok")
-                    if items:
-                        report_lines.append(f"  • {items}")
-                    else:
-                        report_lines.append(f"  • {dict(row)}")
+            if r.task_type == "semantic_search":
+                hits = r.details.get("results", []) if isinstance(r.details, dict) else []
+                if hits:
+                    report_lines.append(f"\n🔎 *{agent_name}*:")
+                    for hit in hits[:5]:
+                        title = str((hit or {}).get("title") or "Sin título").strip()
+                        url = str((hit or {}).get("url") or "").strip()
+                        snippet = str((hit or {}).get("snippet") or "").strip()
+                        line = f"  • {title}"
+                        if url:
+                            line = f"{line} — {url}"
+                        report_lines.append(line)
+                        if snippet:
+                            report_lines.append(f"    {snippet[:240]}")
+                else:
+                    report_lines.append(f"\n✅ *{agent_name}*: sin resultados")
             else:
-                report_lines.append(f"\n✅ *{agent_name}*: completado")
+                rows = r.details.get("rows", [])
+                if rows:
+                    report_lines.append(f"\n📊 *{agent_name}*:")
+                    for row in rows[:10]:
+                        items = " | ".join(f"{k}={v}" for k, v in row.items() if v and v != "ok")
+                        if items:
+                            report_lines.append(f"  • {items}")
+                        else:
+                            report_lines.append(f"  • {dict(row)}")
+                else:
+                    report_lines.append(f"\n✅ *{agent_name}*: completado")
         else:
             reason = r.error if r else "no response"
             report_lines.append(f"\n❌ *{agent_name}*: {reason}")
@@ -558,6 +578,9 @@ def _vote_from_dispatch(agent_name: str, result: DispatchResult) -> tuple[str, s
             rows = result.details.get("rows", [])
             total = result.details.get("total", 0)
             return ("accept", f"{agent_name} consultó datos: {total} resultados.")
+        if result.task_type == "semantic_search":
+            hits = result.details.get("results", [])
+            return ("accept", f"{agent_name} buscó conocimiento: {len(hits)} resultados.")
         if result.task_type == "narrative":
             entry_id = result.details.get("entry_id")
             return ("accept", f"{agent_name} registró narrativa (entry={entry_id}).")

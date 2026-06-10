@@ -92,6 +92,9 @@ class Settings(BaseSettings):
     shopify_api_version: str = "2024-10"
     deepseek_api_key: str = ""
     deepseek_base_url: str = "https://api.deepseek.com"
+    website_embeddings_path: str = "/Users/gusluna/.openclaw/workspace/website_embeddings.sqlite"
+    website_embeddings_model: str = "nomic-embed-text:latest"
+    ollama_embeddings_url: str = "http://host.docker.internal:11434/api/embeddings"
 
     @property
     def projections_path(self) -> Path:

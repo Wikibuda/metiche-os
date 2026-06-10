@@ -58,7 +58,7 @@
           "properties": {
             "agent_name": {
               "type": "string",
-              "enum": ["whatsapp", "telegram", "shopify", "plane", "dashboard", "deepseek"]
+              "enum": ["whatsapp", "telegram", "shopify", "plane", "dashboard", "deepseek", "audio_analyzer", "entity_extractor", "segmenter", "recommender", "executor", "notifier", "knowledge_agent"]
             },
             "task_id": {
               "type": "string",
@@ -91,7 +91,7 @@
     "enum_fields": {
       "policy": ["majority", "leader-follower", "narrative-consensus"],
       "status": ["created", "running", "paused", "completed", "failed", "cancelled"],
-      "agents.agent_name": ["whatsapp", "telegram", "shopify", "plane", "dashboard", "deepseek"],
+      "agents.agent_name": ["whatsapp", "telegram", "shopify", "plane", "dashboard", "deepseek", "audio_analyzer", "entity_extractor", "segmenter", "recommender", "executor", "notifier", "knowledge_agent"],
       "agents.status": ["idle", "queued", "running", "done", "failed", "disabled"]
     },
     "business_rules": [

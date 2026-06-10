@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS swarm_agents (
     status VARCHAR(50) NOT NULL DEFAULT 'idle',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CHECK (agent_name IN ('whatsapp', 'telegram', 'shopify', 'plane', 'dashboard', 'deepseek')),
+    CHECK (agent_name IN ('whatsapp', 'telegram', 'shopify', 'plane', 'dashboard', 'deepseek', 'audio_analyzer', 'entity_extractor', 'segmenter', 'recommender', 'executor', 'notifier', 'knowledge_agent')),
     CHECK (status IN ('idle', 'queued', 'running', 'done', 'failed', 'disabled')),
     UNIQUE (swarm_id, agent_name)
 );
@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS swarm_votes (
     vote VARCHAR(20) NOT NULL,
     argument VARCHAR(2000),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CHECK (agent_name IN ('whatsapp', 'telegram', 'shopify', 'plane', 'dashboard', 'deepseek')),
+    CHECK (agent_name IN ('whatsapp', 'telegram', 'shopify', 'plane', 'dashboard', 'deepseek', 'audio_analyzer', 'entity_extractor', 'segmenter', 'recommender', 'executor', 'notifier', 'knowledge_agent')),
     CHECK (vote IN ('accept', 'reject', 'abstain')),
     CHECK (argument IS NULL OR LENGTH(argument) <= 2000),
     UNIQUE (cycle_id, agent_name)

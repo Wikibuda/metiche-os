@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 from uuid import uuid4
 
@@ -10,6 +12,7 @@ ALLOWED_AGENTS = {
     "whatsapp", "telegram", "shopify", "plane", "dashboard", "deepseek",
     "audio_analyzer", "entity_extractor", "segmenter", "recommender",
     "executor", "notifier",
+    "knowledge_agent",
 }
 
 ALLOWED_TASK_TYPES = {
@@ -19,6 +22,7 @@ ALLOWED_TASK_TYPES = {
     "code_execution",
     "narrative",
     "enjambre",
+    "semantic_search",
 }
 ALLOWED_SWARM_STATUS = {"created", "running", "paused", "completed", "failed", "cancelled"}
 

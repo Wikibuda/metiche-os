@@ -83,6 +83,8 @@ def dispatch_unified_task(
         return _dispatch_batch_sql(session, task)
     if normalized_type == "narrative":
         return _dispatch_narrative(session, task)
+    if normalized_type == "semantic_search":
+        return _dispatch_semantic_search(session, task)
 
     # Existente: send_message
     if normalized_type == "send_message":
@@ -273,3 +275,36 @@ def _dispatch_narrative(session, task):
         return DispatchResult(success=True, channel="narrative", task_type="narrative",
             details={"note": f"Narrative falló ({e}), continuando", "entry_id": None},
             retry_count=0, final_status="ok")
+
+
+def _dispatch_semantic_search(session: Session, task: UnifiedTask) -> DispatchResult:
+    query = str((task.metadata or {}).get("query") or task.message or "").strip()
+    if not query:
+        return DispatchResult(
+            success=False,
+            channel=task.channel or "knowledge",
+            task_type="semantic_search",
+            details={"reason": "empty_query"},
+            retry_count=0,
+            final_status="failed_non_retryable",
+            error="empty_query",
+        )
+    raw_top_k = (task.metadata or {}).get("top_k")
+    try:
+        top_k = int(raw_top_k) if raw_top_k is not None else 5
+    except Exception:
+        top_k = 5
+    top_k = max(1, min(top_k, 10))
+
+    from app.services.knowledge_service import KnowledgeService
+
+    payload = KnowledgeService().search(query, top_k=top_k)
+    return DispatchResult(
+        success=bool(payload.get("ok")),
+        channel=task.channel or "knowledge",
+        task_type="semantic_search",
+        details={"results": payload.get("results", []), "meta": payload.get("meta", {}), "query": query},
+        retry_count=0,
+        final_status="ok" if payload.get("ok") else "failed_non_retryable",
+        error=None if payload.get("ok") else "semantic_search_failed",
+    )
