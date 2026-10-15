@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Meta Ads Automation — Dashboard ROI v2</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #1a1a2e;
+    color: #eaeaea;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: 24px;
+    min-height: 100vh;
+  }
+  h1 { color: #e94560; font-size: 22px; margin-bottom: 4px; }
+  .subtitle { color: #8892b0; font-size: 13px; margin-bottom: 24px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .card {
+    background: #16213e;
+    border-radius: 12px;
+    padding: 18px;
+    border: 1px solid #0f3460;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  }
+  .card .label {
+    color: #8892b0;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+  .card .value {
+    color: #eaeaea;
+    font-size: 26px;
+    font-weight: 700;
+  }
+  .card .value.accent { color: #e94560; }
+  .card .value.green { color: #4ade80; }
+  .card .value.yellow { color: #fbbf24; }
+  .card .delta { font-size: 12px; margin-top: 6px; color: #8892b0; }
+  .chart-card {
+    background: #16213e;
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid #0f3460;
+    margin-bottom: 20px;
+  }
+  .chart-card h2 {
+    color: #eaeaea;
+    font-size: 15px;
+    margin-bottom: 14px;
+    font-weight: 600;
+  }
+  .chart-wrap { position: relative; height: 280px; }
+  .controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+  button {
+    background: #e94560;
+    color: #fff;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  button:hover { background: #ff5c7a; transform: translateY(-1px); }
+  button:disabled { background: #4a5568; cursor: not-allowed; transform: none; }
+  button.secondary {
+    background: transparent;
+    border: 1px solid #0f3460;
+    color: #8892b0;
+  }
+  button.secondary:hover { background: #0f3460; color: #eaeaea; }
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #0f3460;
+    color: #8892b0;
+  }
+  .status-pill .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #4ade80;
+    box-shadow: 0 0 8px #4ade80;
+    animation: pulse 2s infinite;
+  }
+  .status-pill.error .dot { background: #e94560; box-shadow: 0 0 8px #e94560; }
+  .status-pill.running .dot { background: #fbbf24; box-shadow: 0 0 8px #fbbf24; }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .log {
+    background: #0a0e1a;
+    border: 1px solid #0f3460;
+    border-radius: 8px;
+    padding: 12px;
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 11px;
+    color: #8892b0;
+    max-height: 160px;
+    overflow-y: auto;
+    margin-top: 12px;
+  }
+  .log .line { padding: 2px 0; }
+  .log .line.ok { color: #4ade80; }
+  .log .line.err { color: #e94560; }
+  .log .line.warn { color: #fbbf24; }
+  .alert-banner {
+    background: rgba(233, 69, 96, 0.15);
+    border: 1px solid #e94560;
+    color: #ff8fa3;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin-bottom: 16px;
+    display: none;
+  }
+  .alert-banner.show { display: block; }
+</style>
+</head>
+<body>
+
+<h1>📊 Meta Ads Automation — Dashboard ROI v2</h1>
+<div class="subtitle">Agente autónomo de descarga de gasto diario · Puerto 5055</div>
+
+<div class="alert-banner" id="alertBanner"></div>
+
+<div class="controls">
+  <button id="btnRefresh">🔄 Refresh Meta Ads Now</button>
+  <button id="btnCron" class="secondary">⏱️ Ver estado cron</button>
+  <button id="btnRollback" class="secondary">↩️ Rollback manual</button>
+  <span class="status-pill" id="agentStatus">
+    <span class="dot"></span>
+    <span id="agentStatusText">Agente idle</span>
+  </span>
+  <span class="status-pill" id="lastUpdatePill">
+    <span id="lastUpdateText">Última actualización: —</span>
+  </span>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <div class="label">Gasto hoy</div>
+    <div class="value accent" id="spendToday">$0.00</div>
+    <div class="delta" id="spendTodayDelta">vs ayer: —</div>
+  </div>
+  <div class="card">
+    <div class="label">Gasto 30 días</div>
+    <div class="value" id="spend30d">$0.00</div>
+    <div class="delta" id="spend30dDelta">promedio diario: —</div>
+  </div>
+  <div class="card">
+    <div class="label">Presupuesto mensual</div>
+    <div class="value yellow" id="budgetMonth">$0.00</div>
+    <div class="delta" id="budgetDelta">consumido: —</div>
+  </div>
+  <div class="card">
+    <div class="label">ROAS hoy</div>
+    <div class="value green" id="roasToday">—</div>
+    <div class="delta" id="roasDelta">ingresos atribuidos: —</div>
+  </div>
+</div>
+
+<div class="chart-card">
+  <h2>📈 Tendencia de gasto (últimos 30 días)</h2>
+  <div class="chart-wrap"><canvas id="chartTrend"></canvas></div>
+</div>
+
+<div class="chart-card">
+  <h2>📊 Gasto diario vs día anterior</h2>
+  <div class="chart-wrap"><canvas id="chartDaily"></canvas></div>
+</div>
+
+<div class="chart-card">
+  <h2>💰 Presupuesto vs Real (mes actual)</h2>
+  <div class="chart-wrap"><canvas id="chartBudget"></canvas></div>
+</div>
+
+<div class="chart-card">
+  <h2>🧾 Log del agente</h2>
+  <div class="log" id="agentLog">
+    <div class="line">[init] Dashboard cargado. Esperando datos del agente...</div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// Configuración
+// ============================================================
+const CONFIG = {
+  API_BASE: window.location.origin.includes('5055') ? '' : 'http://localhost:5055',
+  SPEND_ALERT_THRESHOLD: 500,
+  MONTHLY_BUDGET: 8000,
+  REFRESH_INTERVAL_MS: 60000
+};
+
+// ============================================================
+// Estado
+// ============================================================
+const state = {
+  spendTrend: [],
+  lastUpdate: null,
+  agentStatus: 'idle',
+  charts: {}
+};
+
+// ============================================================
+// Datos de ejemplo (fallback si el backend no responde)
+// ============================================================
+function generateSampleData() {
+  const days = 30;
+  const trend = [];
+  const today = new Date();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const base = 180 + Math.sin(i / 3) * 60 + Math.random() * 80;
+    trend.push({
+      date: d.toISOString().slice(0, 10),
+      spend: Math.round(base * 100) / 100,
+      revenue: Math.round(base * (2.5 + Math.random() * 1.5) * 100) / 100
+    });
+  }
+  return trend;
+}
+
+// ============================================================
+// Utilidades
+// ============================================================
+function fmtMoney(n) {
+  return '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmtDate(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short' });
+}
+function log(msg, type = '') {
+  const el = document.getElementById('agentLog');
+  const line = document.createElement('div');
+  line.className = 'line ' + type;
+  const ts = new Date().toLocaleTimeString('es-MX', { hour12: false });
+  line.textContent = `[${ts}] ${msg}`;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+  while (el.children.length > 200) el.removeChild(el.firstChild);
+}
+
+// ============================================================
+// Carga de datos
+// ============================================================
+async function fetchSpendTrend() {
+  try {
+    const res = await fetch(`${CONFIG.API_BASE}/api/v2/ads/spend-trend`, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (Array.isArray(data) && data.length) return data;
+    if (data && Array.isArray(data.trend)) return data.trend;
+    throw new Error('Formato inesperado');
+  } catch (e) {
+    log(`Backend no disponible (${e.message}). Usando datos de ejemplo.`, 'warn');
+    return generateSampleData();
+  }
+}
+
+async function fetchAgentStatus() {
+  try {
+    const res = await fetch(`${CONFIG.API_BASE}/api/v2/ads-automation/status`, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    return await res.json();
+  } catch (e) {
+    return { status: 'unknown', lastRun: null, cron: 'desconocido' };
+  }
+}
+
+// ============================================================
+// Render
+// ============================================================
+function renderKPIs(trend) {
+  const today = trend[trend.length - 1] || { spend: 0, revenue: 0 };
+  const yesterday = trend[trend.length - 2] || { spend: 0, revenue: 0 };
+  const last30 = trend.reduce((s, d) => s + d.spend, 0);
+  const avgDaily = last30 / Math.max(trend.length, 1);
+  const monthSpend = trend.slice(-30).reduce((s, d) => s + d.spend, 0);
+  const budgetPct = (monthSpend / CONFIG.MONTHLY_BUDGET) * 100;
+  const roas = today.spend > 0 ? today.revenue / today.spend : 0;
+  const deltaSpend = yesterday.spend > 0
+    ? ((today.spend - yesterday.spend) / yesterday.spend) * 100
+    : 0;
+
+  document.getElementById('spendToday').textContent = fmtMoney(today.spend);
+  document.getElementById('spendTodayDelta').textContent =
+    `vs ayer: ${deltaSpend >= 0 ? '+' : ''}${deltaSpend.toFixed(1)}%`;
+
+  document.getElementById('spend30d').textContent = fmtMoney(last30);
+  document.getElementById('spend30dDelta').textContent = `promedio diario: ${fmtMoney(avgDaily)}`;
+
+  document.getElementById('budgetMonth').textContent = fmtMoney(CONFIG.MONTHLY_BUDGET);
+  document.getElementById('budgetDelta').textContent = `consumido: ${budgetPct.toFixed(1)}% (${fmtMoney(monthSpend)})`;
+
+  document.getElementById('roasToday').textContent = roas > 0 ? roas.toFixed(2) + 'x' : '—';
+  document.getElementById('roasDelta').textContent = `ingresos atribuidos: ${fmtMoney(today.revenue)}`;
+
+  // Alerta de gasto excesivo
+  const banner = document.getElementById('alertBanner');
+  if (today.spend > CONFIG.SPEND_ALERT_THRESHOLD) {
+    banner.textContent = `🚨 Alerta: gasto de hoy (${fmtMoney(today.spend)}) supera el umbral de ${fmtMoney(CONFIG.SPEND_ALERT_THRESHOLD)}. Notificación enviada por Telegram.`;
+    banner.classList.add('show');
+    log(`Alerta de gasto excesivo disparada: ${fmtMoney(today.spend)}`, 'err');
+  } else {
+    banner.classList.remove('show');
+  }
+}
+
+function renderCharts(trend) {
+  const labels = trend.map(d => fmtDate(d.date));
+  const spends = trend.map(d => d.spend);
+  const revenues = trend.map(d => d.revenue);
+
+  // Chart 1: Tendencia
+  if (state.charts.trend) state.charts.trend.destroy();
+  state.charts.trend = new Chart(document.getElementById('chartTrend'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Gasto',
+          data: spends,
+          borderColor: '#e94560',
+          backgroundColor: 'rgba(233,69,96,0.15)',
+          fill: true,
+          tension: 0.35,
+          borderWidth: 2,
+          pointRadius: 0
+        },
+        {
+          label: 'Ingresos',
+          data: revenues,
+          borderColor: '#4ade80',
+          backgroundColor: 'rgba(74,222,128,0.08)',
+          fill: true,
+          tension: 0.35,
+          borderWidth: 2,
+          pointRadius: 0
+        }
+      ]
+    },
+    options: chartOpts()
+  });
+
+  // Chart 2: Gasto diario vs día anterior
+  const prev = spends.map((_, i) => i > 0 ? spends[i - 1] : spends[0]);
+  if (state.charts.daily) state.charts.daily.destroy();
+  state.charts.daily = new Chart(document.getElementById('chartDaily'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Hoy', data: spends, backgroundColor: '#e94560', borderRadius: 4 },
+        { label: 'Día anterior', data: prev, backgroundColor: '#0f3460', borderRadius: 4 }
+      ]
+    },
+    options: chartOpts()
+  });
+
+  // Chart 3: Presupuesto vs Real (acumulado)
+  let acc = 0;
+  const cumulative = spends.map(s => (acc += s));
+  const budgetLine = trend.map((_, i) => (CONFIG.MONTHLY_BUDGET / trend.length) * (i + 1));
+  if (state.charts.budget) state.charts.budget.destroy();
+  state.charts.budget = new Chart(document.getElementById('chartBudget'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Gasto acumulado',
+          data: cumulative,
+          borderColor: '#e94560',
+          backgroundColor: 'rgba(233,69,96,0.15)',
+          fill: true,
+          tension: 0.3,
+          borderWidth: 2,
+          pointRadius: 0
+        },
+        {
+          label: 'Presupuesto lineal',
+          data

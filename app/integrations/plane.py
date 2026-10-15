@@ -488,6 +488,43 @@ def _get_issue_direct(issue_id: str) -> PlaneResponse:
         return PlaneResponse(ok=False, status_code=0, data={}, error=str(exc))
 
 
+def labels_for_issues(issue_ids: list[str]) -> dict[str, list[str]]:
+    """Etiquetas (nombres) por issue_id en UNA sola consulta. {} si no hay BD directa.
+
+    [#530] El panel/War Room necesita las etiquetas de TODOS los issues (no solo los
+    que trae el pull de enjambres) para clasificar por carril con la misma ley que el
+    motor. Sin esto, `list_plane_related_issues` servía `labels=[]` y el carril se
+    decidía por palabras clave.
+    """
+    check = _direct_db_not_available_error()
+    if not check.ok:
+        return {}
+    ids = [str(i).strip() for i in (issue_ids or []) if str(i).strip()]
+    if not ids:
+        return {}
+    out: dict[str, list[str]] = {}
+    try:
+        with _pg_connect() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT il.issue_id::text, l.name
+                FROM issue_labels il
+                JOIN labels l ON l.id = il.label_id
+                WHERE il.issue_id = ANY(%s::uuid[])
+                  AND il.deleted_at IS NULL
+                  AND l.deleted_at IS NULL
+                ORDER BY l.name
+                """,
+                (ids,),
+            )
+            for issue_id, name in cur.fetchall():
+                out.setdefault(str(issue_id), []).append(str(name))
+    except Exception:
+        return out
+    return out
+
+
 def _list_issues_direct(*, limit: int = 50, labels: list[str] | None = None) -> PlaneResponse:
     check = _direct_db_not_available_error()
     if not check.ok:
@@ -499,7 +536,7 @@ def _list_issues_direct(*, limit: int = 50, labels: list[str] | None = None) -> 
             cur = conn.cursor()
             cur.execute(
                 """
-                SELECT i.id::text, i.name, i.description_html, i.updated_at::text, COALESCE(s.name, '') AS state_name, COALESCE(u.email, '') AS created_by
+                SELECT i.id::text, i.name, i.description_html, i.updated_at::text, COALESCE(s.name, '') AS state_name, COALESCE(u.email, '') AS created_by, i.sequence_id
                 FROM issues i
                 LEFT JOIN states s ON s.id = i.state_id
                 LEFT JOIN users u ON u.id = i.created_by_id
@@ -532,6 +569,9 @@ def _list_issues_direct(*, limit: int = 50, labels: list[str] | None = None) -> 
                 output.append(
                     {
                         "id": issue_id,
+                        # `sequence_id` da el número visible del issue (MASAM-<seq>), que es lo
+                        # que necesitan el enlace /browse y el botón «Lanzar» del War Room.
+                        "sequence_id": int(row[6]) if row[6] is not None else None,
                         "name": str(row[1] or ""),
                         "description_html": str(row[2] or ""),
                         "updated_at": str(row[3] or ""),

@@ -893,6 +893,27 @@
             </details>
         </section>
 
+        <section class="panel" id="run-issue-panel">
+            <h2>Correr un issue (motor)</h2>
+            <div class="alert hidden" id="run-issue-alert"></div>
+            <div class="meta">Elige un issue de la ventana vigente (últimos 7 días). Lo corre el MOTOR de la Mac
+                (<code>runner.py --seq</code>, verificado 05-oct-2026), que sigue siendo el único cerebro:
+                esta consola solo se lo pide. El runner respeta la pausa.</div>
+            <div class="kv">
+                <div class="kv-item" style="grid-column: 1 / -1;">
+                    <div class="kv-key">Issue</div>
+                    <select class="input" id="run-issue-select">
+                        <option value="">Cargando lista…</option>
+                    </select>
+                </div>
+            </div>
+            <div class="action-row">
+                <button class="btn" id="run-issue-btn" type="button">Correr issue</button>
+                <button class="btn secondary" id="run-issue-refresh" type="button">Recargar lista</button>
+                <span class="action-note" id="run-issue-note"></span>
+            </div>
+        </section>
+
         <section class="panel" id="swarm-history-panel">
             <h2>Lanzar Enjambre</h2>
             <div class="alert hidden" id="swarm-launch-alert"></div>
@@ -1524,6 +1545,75 @@
             }, 12000);
         }
 
+        async function loadIssueOptions() {
+            const sel = document.getElementById("run-issue-select");
+            if (!sel) return;
+            const previo = sel.value;
+            sel.innerHTML = '<option value="">Cargando lista…</option>';
+            try {
+                const data = await fetchJsonWithTimeout("/dashboard/tasks?limit=400", 12000);
+                const tasks = Array.isArray(data && data.tasks) ? data.tasks : [];
+                const items = tasks
+                    .filter((t) => String(t.task_id || "").startsWith("plane-"))
+                    .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+                if (!items.length) {
+                    sel.innerHTML = '<option value="">(sin issues en la ventana)</option>';
+                    return;
+                }
+                const opts = ['<option value="">— elige un issue —</option>'];
+                items.forEach((t) => {
+                    const seq = String(t.task_id).replace("plane-", "");
+                    const fecha = String(t.created_at || "").slice(0, 10);
+                    const estado = String(t.status || "");
+                    opts.push(`<option value="${seq}">#${seq} · ${fecha} · ${estado} · ${escapeHtml(t.title || "")}</option>`);
+                });
+                sel.innerHTML = opts.join("");
+                if (previo) sel.value = previo;
+            } catch (error) {
+                sel.innerHTML = `<option value="">(no pude cargar la lista: ${escapeHtml(error.message)})</option>`;
+            }
+        }
+
+        async function runSelectedIssue() {
+            const sel = document.getElementById("run-issue-select");
+            const btn = document.getElementById("run-issue-btn");
+            const nota = document.getElementById("run-issue-note");
+            const seq = String((sel && sel.value) || "").trim();
+            if (!seq) {
+                setAlert("run-issue-alert", "warn", "Elige un issue de la lista primero.");
+                return;
+            }
+            setAlert("run-issue-alert", "info", `Pidiendo al motor que corra #${seq}… (puede tardar)`);
+            btn.disabled = true;
+            nota.textContent = "Enviado al motor…";
+            try {
+                const resp = await fetch("/api/run-issue", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ seq })
+                });
+                const texto = await resp.text();
+                let data = null;
+                try { data = JSON.parse(texto); } catch (e) { data = null; }
+                const salida = String((data && data.salida) || "").split("\n").filter(Boolean).slice(-3).join(" | ");
+                if (!data) {
+                    setAlert("run-issue-alert", "error", `❌ El servidor no devolvió JSON (HTTP ${resp.status}): ${texto.slice(0, 160)}`);
+                } else if (data && data.ok && data.lanzado) {
+                    setAlert("run-issue-alert", "info", `🚀 #${seq} lanzado: ya lo está corriendo el motor. Sigue el avance en la columna "running" del tablero y en el log del issue.`);
+                } else if (data && data.ok) {
+                    setAlert("run-issue-alert", "info", `✅ #${seq} disparado por el motor. ${salida}`);
+                } else {
+                    setAlert("run-issue-alert", "error", `❌ No se pudo correr #${seq}: ${(data && data.error) || salida || "sin detalle"}`);
+                }
+                nota.textContent = "";
+            } catch (error) {
+                setAlert("run-issue-alert", "error", `❌ Falló la llamada: ${error.message}`);
+                nota.textContent = "";
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
         async function launchSwarmFromDashboard() {
             const runBtn = document.getElementById("swarm-run-btn");
             const name = document.getElementById("swarm-name").value.trim();
@@ -1684,7 +1774,7 @@
             const theme = localStorage.getItem("warroom_theme") || "dark";
             setTheme(theme);
             document.body.classList.add("swarm-console-mode");
-            const visiblePanels = new Set(["swarm-launch-panel", "swarm-history-panel", "channels-status-panel"]);
+            const visiblePanels = new Set(["run-issue-panel", "swarm-launch-panel", "swarm-history-panel", "channels-status-panel"]);
             document.querySelectorAll("section.panel").forEach((panel) => {
                 if (!(panel instanceof HTMLElement)) return;
                 if (!visiblePanels.has(panel.id)) {
@@ -1758,6 +1848,11 @@
             await loadRecentSwarms(selectedSwarmId);
             setSwarmActionNote("Lista actualizada.");
         });
+
+        document.getElementById("run-issue-btn").addEventListener("click", runSelectedIssue);
+        document.getElementById("run-issue-refresh").addEventListener("click", loadIssueOptions);
+        loadIssueOptions();
+
 
         document.getElementById("swarm-recent-rows").addEventListener("click", async (event) => {
             const target = event.target;

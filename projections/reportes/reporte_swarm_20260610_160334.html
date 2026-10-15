@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KPI Plane · Reporte Ejecutivo</title>
+    <!-- Chart.js CDN v4 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #1a1a2e;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 2rem 1.5rem;
+            color: #e0e0e0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .dashboard {
+            max-width: 1300px;
+            width: 100%;
+        }
+        h1 {
+            font-weight: 500;
+            font-size: 2rem;
+            letter-spacing: -0.02em;
+            margin-bottom: 0.25rem;
+            color: #f0f0f5;
+        }
+        .subhead {
+            color: #9a9ab0;
+            font-size: 0.95rem;
+            margin-bottom: 2.5rem;
+            border-left: 3px solid #e94560;
+            padding-left: 1rem;
+            font-weight: 400;
+        }
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        .card {
+            background: #16213e;
+            border-radius: 24px;
+            padding: 1.75rem 1.5rem 1.5rem 1.5rem;
+            box-shadow: 0 20px 35px -10px rgba(0, 0, 0, 0.6);
+            transition: transform 0.2s ease;
+            border: 1px solid #2a2a4a;
+        }
+        .card:hover {
+            transform: translateY(-3px);
+            border-color: #3a3a5a;
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 1.25rem;
+        }
+        .card-header h2 {
+            font-weight: 500;
+            font-size: 1.25rem;
+            color: #d0d0e8;
+            letter-spacing: -0.01em;
+        }
+        .card-header .badge {
+            background: #2a2a4a;
+            padding: 0.2rem 0.8rem;
+            border-radius: 40px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            color: #b0b0d0;
+            border: 1px solid #3a3a5a;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 240px;
+        }
+        .chart-container canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+        .kpi-row {
+            display: flex;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+            margin-top: 1.5rem;
+            justify-content: flex-start;
+        }
+        .kpi-item {
+            background: #0f1a2e;
+            padding: 0.6rem 1.4rem 0.6rem 1.2rem;
+            border-radius: 40px;
+            border-left: 4px solid #e94560;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+        }
+        .kpi-item span:first-child {
+            color: #9a9ab0;
+            font-weight: 400;
+        }
+        .kpi-item span:last-child {
+            font-weight: 600;
+            color: #f0f0f5;
+            background: #1a1a3e;
+            padding: 0.15rem 0.8rem;
+            border-radius: 30px;
+        }
+        .footer-note {
+            margin-top: 2.5rem;
+            text-align: center;
+            font-size: 0.75rem;
+            color: #5a5a7a;
+            border-top: 1px solid #2a2a4a;
+            padding-top: 1.5rem;
+            letter-spacing: 0.3px;
+        }
+        @media (max-width: 800px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+            body { padding: 1.25rem; }
+        }
+    </style>
+</head>
+<body>
+<div class="dashboard">
+    <h1>📊 KPI Plane · Ejecutivo</h1>
+    <div class="subhead">Issues por estado · Completados por mes · datos simulados Q1-Q3</div>
+
+    <div class="grid-2">
+        <!-- BAR CHART: Issues por estado -->
+        <div class="card">
+            <div class="card-header">
+                <h2>🔷 Issues por estado</h2>
+                <span class="badge">actualizado</span>
+            </div>
+            <div class="chart-container">
+                <canvas id="barChart"></canvas>
+            </div>
+            <div class="kpi-row">
+                <div class="kpi-item"><span>total</span><span>47</span></div>
+                <div class="kpi-item"><span>pendientes</span><span>18</span></div>
+                <div class="kpi-item"><span>en progreso</span><span>12</span></div>
+            </div>
+        </div>
+
+        <!-- LINE CHART: Completados por mes -->
+        <div class="card">
+            <div class="card-header">
+                <h2>✅ Completados por mes</h2>
+                <span class="badge">tendencia</span>
+            </div>
+            <div class="chart-container">
+                <canvas id="lineChart"></canvas>
+            </div>
+            <div class="kpi-row">
+                <div class="kpi-item"><span>promedio</span><span>8.3</span></div>
+                <div class="kpi-item"><span>pico</span><span>13</span></div>
+                <div class="kpi-item"><span>último mes</span><span>11</span></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer-note">
+        Plane · reporte generado con Chart.js · datos de ejemplo representativos
+    </div>
+</div>
+
+<script>
+    (function() {
+        // ----- BAR CHART: Issues por estado -----
+        const barCtx = document.getElementById('barChart').getContext('2d');
+        const barChart = new Chart(barCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Pendiente', 'En progreso', 'Revisión', 'Bloqueado', 'Cerrado'],
+                datasets: [{
+                    label: 'Issues',
+                    data: [18, 12, 7, 5, 5],
+                    backgroundColor: [
+                        '#e94560',   // pendiente
+                        '#f5a623',   // en progreso
+                        '#4ecdc4',   // revisión
+                        '#ff6b6b',   // bloqueado
+                        '#2ecc71'    // cerrado
+                    ],
+                    borderRadius: 6,
+                    borderSkipped: false,
+                    barPercentage: 0.65,
+                    categoryPercentage: 0.8,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#0f1a2e',
+                        titleColor: '#e0e0f0',
+                        bodyColor: '#c0c0d8',
+                        borderColor: '#3a3a5a',
+                        borderWidth: 1,
+                        cornerRadius: 10,
+                        padding: 10,
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: '#2a2a4a', drawBorder: false },
+                        ticks: { color: '#9a9ab0', stepSize: 4, font: { size: 11 } }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#b0b0c8', font: { size: 11 } }
+                    }
+                }
+            }
+        });
+
+        // ----- LINE CHART: Completados por mes -----
+        const lineCtx = document.getElementById('lineChart').getContext('2d');
+        const lineChart = new Chart(lineCtx, {
+            type: 'line',
+            data: {
+                labels: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep'],
+                datasets: [{
+                    label: 'Completados',
+                    data: [5, 7, 9, 6, 10, 13, 8, 11, 7],
+                    borderColor: '#e94560',
+                    backgroundColor: 'rgba(233, 69, 96, 0.08)',
+                    fill: true,
+                    tension: 0.3,
+                    pointBackgroundColor: '#e94560',
+                    pointBorderColor: '#1a1a2e',
+                    pointBorderWidth: 2,
+                    pointRadius: 4,
+                    pointHoverRadius: 7,
+                    borderWidth: 3,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#0f1a2e',
+                        titleColor: '#e0e0f0',
+                        bodyColor: '#c0c0d8',
+                        borderColor: '#3a3a5a',
+                        borderWidth: 1,
+                        cornerRadius: 10,
+                        padding: 10,
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: '#2a2a4a', drawBorder: false },
+                        ticks: { color: '#9a9ab0', stepSize: 3, font: { size: 11 } }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#b0b0c8', font: { size: 11 } }
+                    }
+                },
+                interaction: {
+                    intersect: false,
+                    mode: 'index',
+                }
+            }
+        });
+
+        // pequeña actualización de KPI dinámicos (opcional, ya están estáticos)
+        // se deja como ejemplo visual coherente
+    })();
+</script>
+
+<!--
+  Archivos creados/modificados:
+  - kpi-plane-report.html (este archivo, autocontenido)
+
+  Resultados concretos:
+  - Dashboard HTML con Chart.js v4 (CDN)
+  - Gráfico de barras: issues por estado (5 categorías)
+  - Gráfico de líneas: completados por mes (9 meses)
+  - Diseño dark profesional (#1a1a2e, #16213e, #e94560)
+  - KPIs resumen con totales y promedios
+
+  Resumen ejecutivo:
+  Se generó un reporte HTML ejecutivo de KPIs para Plane, con dos gráficos
+  (barras y líneas) usando Chart.js, estilo dark y datos de ejemplo representativos.
+  El archivo es completamente autocontenido y listo para visualizar en navegador.
+-->
+</body>
+</html>

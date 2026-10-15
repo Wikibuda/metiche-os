@@ -1,0 +1,420 @@
+```html
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Issues Completados Junio vs Mayo 2026</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #1a1a2e;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            color: #e0e0e0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            width: 100%;
+            background: #16213e;
+            border-radius: 24px;
+            padding: 30px 25px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+            border: 1px solid #0f3460;
+        }
+        h1 {
+            font-size: 1.9rem;
+            font-weight: 600;
+            color: #e94560;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        h1 small {
+            font-size: 1rem;
+            font-weight: 400;
+            color: #8899aa;
+            background: #1a1a2e;
+            padding: 4px 14px;
+            border-radius: 40px;
+            border: 1px solid #2a2a4a;
+        }
+        .subtitle {
+            color: #a0b0c0;
+            margin-bottom: 28px;
+            font-size: 0.95rem;
+            border-left: 4px solid #e94560;
+            padding-left: 16px;
+            background: rgba(233,69,96,0.06);
+            border-radius: 0 12px 12px 0;
+            line-height: 1.5;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 30px;
+        }
+        .card {
+            background: #1a1a2e;
+            border-radius: 18px;
+            padding: 20px 18px 18px;
+            border: 1px solid #2a2a4a;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+        }
+        .card h2 {
+            font-size: 1.2rem;
+            font-weight: 500;
+            color: #c0d0e0;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .card h2 span {
+            background: #e94560;
+            color: white;
+            font-size: 0.7rem;
+            padding: 2px 10px;
+            border-radius: 30px;
+            font-weight: 600;
+        }
+        .chart-wrapper {
+            position: relative;
+            height: 200px;
+            width: 100%;
+        }
+        .stats-row {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 14px;
+            padding-top: 12px;
+            border-top: 1px solid #2a2a4a;
+            font-size: 0.9rem;
+        }
+        .stat-item {
+            text-align: center;
+        }
+        .stat-item .num {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #e94560;
+            display: block;
+        }
+        .stat-item .label {
+            color: #8899aa;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .table-section {
+            background: #1a1a2e;
+            border-radius: 18px;
+            padding: 18px 18px 14px;
+            border: 1px solid #2a2a4a;
+            margin-top: 6px;
+        }
+        .table-section h3 {
+            font-size: 1.1rem;
+            font-weight: 500;
+            color: #c0d0e0;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .table-section h3 i {
+            color: #e94560;
+            font-style: normal;
+            font-size: 1.2rem;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        th {
+            text-align: left;
+            padding: 10px 8px 8px 8px;
+            color: #8899aa;
+            font-weight: 500;
+            border-bottom: 1px solid #2a2a4a;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            font-size: 0.75rem;
+        }
+        td {
+            padding: 10px 8px;
+            border-bottom: 1px solid #1e1e3a;
+            color: #d0d8e0;
+        }
+        tr:last-child td {
+            border-bottom: none;
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 12px;
+            border-radius: 40px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: #2a2a4a;
+            color: #b0c0d0;
+        }
+        .badge.done { background: #1b5e3a; color: #a0e0b0; }
+        .badge.in-progress { background: #3a4a6a; color: #b0c8f0; }
+        .badge.pending { background: #5a3a2a; color: #f0c8a0; }
+        .badge.blocked { background: #5a2a3a; color: #f0a0b0; }
+        .badge.review { background: #2a4a5a; color: #a0d8e0; }
+        .footer-note {
+            margin-top: 20px;
+            text-align: right;
+            font-size: 0.75rem;
+            color: #5a6a7a;
+            border-top: 1px solid #1e1e3a;
+            padding-top: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .footer-note .date {
+            color: #7a8a9a;
+        }
+        .footer-note .version {
+            background: #0f3460;
+            padding: 2px 14px;
+            border-radius: 30px;
+            color: #a0b8d0;
+        }
+        @media (max-width: 700px) {
+            .grid { grid-template-columns: 1fr; }
+            .container { padding: 18px; }
+            h1 { font-size: 1.5rem; flex-wrap: wrap; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>
+        📊 Issues completados
+        <small>junio vs mayo 2026</small>
+    </h1>
+    <div class="subtitle">
+        🔍 Comparativa mensual · Datos simulados con tendencia realista · Proyecto Enjambre
+    </div>
+
+    <div class="grid">
+        <!-- Mayo -->
+        <div class="card">
+            <h2>📅 Mayo 2026 <span>completados</span></h2>
+            <div class="chart-wrapper">
+                <canvas id="chartMayo"></canvas>
+            </div>
+            <div class="stats-row">
+                <div class="stat-item"><span class="num" id="mayoCompletados">0</span><span class="label">completados</span></div>
+                <div class="stat-item"><span class="num" id="mayoTotal">0</span><span class="label">total issues</span></div>
+                <div class="stat-item"><span class="num" id="mayoPct">0%</span><span class="label">eficiencia</span></div>
+            </div>
+        </div>
+
+        <!-- Junio -->
+        <div class="card">
+            <h2>📅 Junio 2026 <span>completados</span></h2>
+            <div class="chart-wrapper">
+                <canvas id="chartJunio"></canvas>
+            </div>
+            <div class="stats-row">
+                <div class="stat-item"><span class="num" id="junioCompletados">0</span><span class="label">completados</span></div>
+                <div class="stat-item"><span class="num" id="junioTotal">0</span><span class="label">total issues</span></div>
+                <div class="stat-item"><span class="num" id="junioPct">0%</span><span class="label">eficiencia</span></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla de pendientes por estado -->
+    <div class="table-section">
+        <h3><i>📋</i> Pendientes por estado · Junio 2026</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Estado</th>
+                    <th>Cantidad</th>
+                    <th>% del total</th>
+                    <th>Etiqueta</th>
+                </tr>
+            </thead>
+            <tbody id="tablaPendientes">
+                <!-- se llena con JS -->
+            </tbody>
+        </table>
+        <div style="margin-top: 12px; font-size: 0.8rem; color: #6a7a8a; background: #0f1a2e; padding: 8px 12px; border-radius: 12px;">
+            ⚡ Datos actualizados con simulación de carga de trabajo · Los valores reflejan tendencias de equipo ágil.
+        </div>
+    </div>
+
+    <div class="footer-note">
+        <span class="date">📆 Reporte generado: 30 junio 2026 · Enjambre Analytics</span>
+        <span class="version">v2.1 · pulido</span>
+    </div>
+</div>
+
+<script>
+    (function() {
+        // ----------------------------------------------------------------
+        // DATOS DE EJEMPLO (simulación realista)
+        // ----------------------------------------------------------------
+        // Mayo 2026: 34 issues total, 22 completados, 12 pendientes
+        const mayoTotal = 34;
+        const mayoCompletados = 22;
+        const mayoPendientes = mayoTotal - mayoCompletados; // 12
+
+        // Junio 2026: 41 issues total, 31 completados, 10 pendientes
+        const junioTotal = 41;
+        const junioCompletados = 31;
+        const junioPendientes = junioTotal - junioCompletados; // 10
+
+        // Pendientes por estado (junio)
+        const estados = [
+            { estado: 'En progreso', cantidad: 3, clase: 'in-progress' },
+            { estado: 'Pendiente', cantidad: 4, clase: 'pending' },
+            { estado: 'Bloqueado', cantidad: 1, clase: 'blocked' },
+            { estado: 'En revisión', cantidad: 2, clase: 'review' }
+        ];
+        // total pendientes debe sumar 10
+        // (3+4+1+2 = 10) correcto
+
+        // ----------------------------------------------------------------
+        // Renderizar valores en tarjetas
+        // ----------------------------------------------------------------
+        document.getElementById('mayoCompletados').textContent = mayoCompletados;
+        document.getElementById('mayoTotal').textContent = mayoTotal;
+        document.getElementById('mayoPct').textContent = Math.round((mayoCompletados / mayoTotal) * 100) + '%';
+
+        document.getElementById('junioCompletados').textContent = junioCompletados;
+        document.getElementById('junioTotal').textContent = junioTotal;
+        document.getElementById('junioPct').textContent = Math.round((junioCompletados / junioTotal) * 100) + '%';
+
+        // ----------------------------------------------------------------
+        // Tabla de pendientes
+        // ----------------------------------------------------------------
+        const tbody = document.getElementById('tablaPendientes');
+        tbody.innerHTML = '';
+        estados.forEach(item => {
+            const pct = ((item.cantidad / junioPendientes) * 100).toFixed(1);
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><span class="badge ${item.clase}">${item.estado}</span></td>
+                <td><strong>${item.cantidad}</strong></td>
+                <td>${pct}%</td>
+                <td style="color:#8899aa; font-size:0.8rem;">${item.cantidad} issue${item.cantidad !== 1 ? 's' : ''}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        // ----------------------------------------------------------------
+        // GRÁFICOS (donas) con Chart.js
+        // ----------------------------------------------------------------
+        function crearGrafico(id, completados, pendientes, labelCompletados, labelPendientes) {
+            const ctx = document.getElementById(id).getContext('2d');
+            return new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: [labelCompletados, labelPendientes],
+                    datasets: [{
+                        data: [completados, pendientes],
+                        backgroundColor: ['#e94560', '#2a2a4a'],
+                        borderColor: ['#e94560', '#3a3a5a'],
+                        borderWidth: 2,
+                        hoverOffset: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '65%',
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'bottom',
+                            labels: {
+                                color: '#b0c0d0',
+                                padding: 12,
+                                font: { size: 11 },
+                                usePointStyle: true,
+                                pointStyle: 'circle'
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: '#0f1a2e',
+                            titleColor: '#e0e8f0',
+                            bodyColor: '#c0d0e0',
+                            borderColor: '#2a3a5a',
+                            borderWidth: 1,
+                            padding: 10,
+                            callbacks: {
+                                label: function(context) {
+                                    let total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    let pct = ((context.parsed / total) * 100).toFixed(1);
+                                    return context.label + ': ' + context.parsed + ' (' + pct + '%)';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Mayo: completados vs pendientes
+        crearGrafico('chartMayo', mayoCompletados, mayoPendientes, '✅ Completados', '⏳ Pendientes');
+        // Junio: completados vs pendientes
+        crearGrafico('chartJunio', junioCompletados, junioPendientes, '✅ Completados', '⏳ Pendientes');
+
+        // ----------------------------------------------------------------
+        // Pequeña animación de conteo (opcional, para dar sensación de pulido)
+        // ----------------------------------------------------------------
+        function animarNumero(elementoId, valorFinal, duracion = 600) {
+            const el = document.getElementById(elementoId);
+            const start = performance.now();
+            const valorInicial = 0;
+            const rango = valorFinal - valorInicial;
+            function step(now) {
+                let progreso = Math.min((now - start) / duracion, 1);
+                // easing suave
+                progreso = 1 - Math.pow(1 - progreso, 3);
+                const actual = Math.round(valorInicial + rango * progreso);
+                el.textContent = actual;
+                if (progreso < 1) {
+                    requestAnimationFrame(step);
+                } else {
+                    el.textContent = valorFinal;
+                }
+            }
+            requestAnimationFrame(step);
+        }
+
+        // Animar los números principales (solo los completados y totales)
+        animarNumero('mayoCompletados', mayoCompletados, 700);
+        animarNumero('mayoTotal', mayoTotal, 700);
+        animarNumero('junioCompletados', junioCompletados, 700);
+        animarNumero('junioTotal', junioTotal, 700);
+        // porcentajes no se animan porque ya se setearon directo (textContent)
+        // pero podemos refrescar el porcentaje después de animar (opcional)
+        setTimeout(() => {
+            document.getElementById('mayoPct').textContent = Math.round((mayoCompletados / mayoTotal) * 100) + '%';
+            document.getElementById('junioPct').textContent = Math.round((junioCompletados / junioTotal) * 100) + '%';
+        }, 750);
+    })();
+</script>
+
+<!-- Backup simbólico: este archivo es el único creado/modificado -->
+<!-- Archivos creados/modificados: ./issues-completados-junio-m

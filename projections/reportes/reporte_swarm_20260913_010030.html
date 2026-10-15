@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Meta Ads Automation — Dashboard ROI v2</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #1a1a2e;
+    color: #eaeaea;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: 24px;
+    min-height: 100vh;
+  }
+  h1 { font-size: 22px; margin-bottom: 4px; color: #fff; }
+  .sub { color: #8a8aa3; font-size: 13px; margin-bottom: 20px; }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .card {
+    background: #16213e;
+    border-radius: 12px;
+    padding: 18px;
+    border: 1px solid #22305a;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+  }
+  .card .label { font-size: 12px; color: #8a8aa3; text-transform: uppercase; letter-spacing: 0.5px; }
+  .card .value { font-size: 26px; font-weight: 700; margin-top: 6px; color: #fff; }
+  .card .delta { font-size: 12px; margin-top: 4px; }
+  .up { color: #4ade80; }
+  .down { color: #e94560; }
+  .accent { color: #e94560; }
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+  button {
+    background: #e94560;
+    color: #fff;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.1s, background 0.2s;
+  }
+  button:hover { background: #ff5c78; }
+  button:active { transform: scale(0.97); }
+  button:disabled { background: #4a4a5e; cursor: not-allowed; }
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #16213e;
+    border: 1px solid #22305a;
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+  }
+  .dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: #4ade80;
+    box-shadow: 0 0 8px #4ade80;
+  }
+  .dot.warn { background: #facc15; box-shadow: 0 0 8px #facc15; }
+  .dot.err { background: #e94560; box-shadow: 0 0 8px #e94560; }
+  .chart-wrap {
+    background: #16213e;
+    border-radius: 12px;
+    padding: 18px;
+    border: 1px solid #22305a;
+    margin-bottom: 20px;
+  }
+  .chart-wrap h2 { font-size: 15px; margin-bottom: 12px; color: #cfcfe0; font-weight: 600; }
+  canvas { max-height: 320px; }
+  .log {
+    background: #0f1729;
+    border: 1px solid #22305a;
+    border-radius: 10px;
+    padding: 14px;
+    font-family: ui-monospace, Menlo, monospace;
+    font-size: 12px;
+    color: #a8b3cf;
+    max-height: 180px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+  }
+  .log .ok { color: #4ade80; }
+  .log .err { color: #e94560; }
+  .log .info { color: #60a5fa; }
+</style>
+</head>
+<body>
+  <h1>📊 Meta Ads Automation — Dashboard ROI v2</h1>
+  <div class="sub">Agente autónomo de descarga de gasto diario · Puerto 5055</div>
+
+  <div class="toolbar">
+    <button id="btnRefresh">🔄 Refresh Meta Ads Now</button>
+    <button id="btnHealth" style="background:#22305a;">🩺 Health Check Agente</button>
+    <div class="status-pill">
+      <span class="dot" id="agentDot"></span>
+      <span id="agentStatus">Agente: idle</span>
+    </div>
+    <div class="status-pill">
+      <span>Última actualización:</span>
+      <strong id="lastUpdate" class="accent">—</strong>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="label">Gasto hoy (Meta Ads)</div>
+      <div class="value" id="spendToday">$0.00</div>
+      <div class="delta" id="spendTodayDelta">—</div>
+    </div>
+    <div class="card">
+      <div class="label">Gasto 30 días</div>
+      <div class="value" id="spend30">$0.00</div>
+      <div class="delta" id="spend30Delta">—</div>
+    </div>
+    <div class="card">
+      <div class="label">ROAS hoy</div>
+      <div class="value" id="roasToday">0.00x</div>
+      <div class="delta" id="roasTodayDelta">—</div>
+    </div>
+    <div class="card">
+      <div class="label">Presupuesto mes</div>
+      <div class="value" id="budgetMonth">$0 / $0</div>
+      <div class="delta" id="budgetDelta">—</div>
+    </div>
+  </div>
+
+  <div class="chart-wrap">
+    <h2>📈 Tendencia de gasto diario (últimos 30 días)</h2>
+    <canvas id="trendChart"></canvas>
+  </div>
+
+  <div class="chart-wrap">
+    <h2>💰 Presupuesto vs Real (acumulado mes)</h2>
+    <canvas id="budgetChart"></canvas>
+  </div>
+
+  <div class="chart-wrap">
+    <h2>🧾 Log del agente</h2>
+    <div class="log" id="logBox">[boot] Dashboard ROI v2 iniciado · esperando acción…</div>
+  </div>
+
+<script>
+const API_BASE = window.location.origin;
+const MONTHLY_BUDGET = 15000;
+const DAILY_ALERT_THRESHOLD = 500;
+
+const state = {
+  spendTrend: [],
+  lastUpdate: null,
+  agentStatus: 'idle',
+  revenueByDay: {}
+};
+
+function fmtMoney(n) {
+  return '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmtDate(d) {
+  return new Date(d).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' });
+}
+function log(msg, cls = 'info') {
+  const box = document.getElementById('logBox');
+  const t = new Date().toLocaleTimeString();
+  const line = document.createElement('div');
+  line.className = cls;
+  line.textContent = `[${t}] ${msg}`;
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+}
+function setAgentStatus(status) {
+  state.agentStatus = status;
+  const dot = document.getElementById('agentDot');
+  const txt = document.getElementById('agentStatus');
+  dot.className = 'dot';
+  if (status === 'running') { dot.classList.add('warn'); txt.textContent = 'Agente: ejecutando…'; }
+  else if (status === 'error') { dot.classList.add('err'); txt.textContent = 'Agente: error'; }
+  else if (status === 'ok') { txt.textContent = 'Agente: OK'; }
+  else { txt.textContent = 'Agente: idle'; }
+}
+
+// ---------- Datos de ejemplo (fallback si no hay backend) ----------
+function generateSampleTrend(days = 30) {
+  const out = [];
+  const today = new Date();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const base = 320 + Math.sin(i / 3) * 80 + Math.random() * 120;
+    out.push({
+      date: d.toISOString().slice(0, 10),
+      spend: Math.round(base * 100) / 100,
+      revenue: Math.round(base * (2.1 + Math.random() * 0.8) * 100) / 100
+    });
+  }
+  return out;
+}
+
+// ---------- Fetch real con fallback ----------
+async function fetchTrend() {
+  try {
+    const r = await fetch(`${API_BASE}/api/v2/ads/spend-trend?days=30`, { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    if (Array.isArray(data) && data.length) return data;
+    if (Array.isArray(data.trend) && data.trend.length) return data.trend;
+    throw new Error('formato inesperado');
+  } catch (e) {
+    log(`Fallback a datos de ejemplo: ${e.message}`, 'err');
+    return generateSampleTrend(30);
+  }
+}
+
+async function fetchRevenue() {
+  try {
+    const r = await fetch(`${API_BASE}/api/v2/revenue/daily?days=30`, { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    const map = {};
+    (data.days || data || []).forEach(d => { map[d.date] = d.revenue || d.amount || 0; });
+    return map;
+  } catch {
+    return {};
+  }
+}
+
+// ---------- Render ----------
+let trendChart, budgetChart;
+
+function renderKPIs(trend) {
+  const today = trend[trend.length - 1] || { spend: 0, revenue: 0 };
+  const yesterday = trend[trend.length - 2] || { spend: 0, revenue: 0 };
+  const sum30 = trend.reduce((a, b) => a + (b.spend || 0), 0);
+  const sum30Prev = trend.slice(0, 15).reduce((a, b) => a + (b.spend || 0), 0);
+  const sum30Last = trend.slice(15).reduce((a, b) => a + (b.spend || 0), 0);
+
+  document.getElementById('spendToday').textContent = fmtMoney(today.spend);
+  const dToday = yesterday.spend ? ((today.spend - yesterday.spend) / yesterday.spend) * 100 : 0;
+  const elToday = document.getElementById('spendTodayDelta');
+  elToday.textContent = `${dToday >= 0 ? '▲' : '▼'} ${Math.abs(dToday).toFixed(1)}% vs ayer`;
+  elToday.className = 'delta ' + (dToday >= 0 ? 'down' : 'up');
+
+  document.getElementById('spend30').textContent = fmtMoney(sum30);
+  const d30 = sum30Prev ? ((sum30Last - sum30Prev) / sum30Prev) * 100 : 0;
+  const el30 = document.getElementById('spend30Delta');
+  el30.textContent = `${d30 >= 0 ? '▲' : '▼'} ${Math.abs(d30).toFixed(1)}% 15d vs 15d`;
+  el30.className = 'delta ' + (d30 >= 0 ? 'down' : 'up');
+
+  const roas = today.spend ? (today.revenue / today.spend) : 0;
+  const roasY = yesterday.spend ? (yesterday.revenue / yesterday.spend) : 0;
+  document.getElementById('roasToday').textContent = roas.toFixed(2) + 'x';
+  const dRoas = roasY ? ((roas - roasY) / roasY) * 100 : 0;
+  const elRoas = document.getElementById('roasTodayDelta');
+  elRoas.textContent = `${dRoas >= 0 ? '▲' : '▼'} ${Math.abs(dRoas).toFixed(1)}% vs ayer`;
+  elRoas.className = 'delta ' + (dRoas >= 0 ? 'up' : 'down');
+
+  const monthSpend = trend.slice(-30).reduce((a, b) => a + (b.spend || 0), 0);
+  document.getElementById('budgetMonth').textContent = `${fmtMoney(monthSpend)} / ${fmtMoney(MONTHLY_BUDGET)}`;
+  const pct = (monthSpend / MONTHLY_BUDGET) * 100;
+  const elB = document.getElementById('budgetDelta');
+  elB.textContent = `${pct.toFixed(1)}% consumido`;
+  elB.className = 'delta ' + (pct > 90 ? 'down' : 'up');
+
+  if (today.spend > DAILY_ALERT_THRESHOLD) {
+    log(`⚠️ ALERTA: gasto diario ${fmtMoney(today.spend)} supera umbral ${fmtMoney(DAILY_ALERT_THRESHOLD)}`, 'err');
+  }
+}
+
+function renderTrendChart(trend) {
+  const ctx = document.getElementById('trendChart').getContext('2d');
+  const labels = trend.map(d => fmtDate(d.date));
+  const spends = trend.map(d => d.spend);
+  const revenues = trend.map(d => d.revenue || 0);
+
+  if (trendChart) trendChart.destroy();
+  trendChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Gasto',
+          data: spends,
+          borderColor: '#e94560',
+          backgroundColor: 'rgba(233,69,96,0.15)',
+          fill: true,
+          tension: 0.35,
+          pointRadius: 2
+        },
+        {
+          label: 'Ingresos',
+          data: revenues,
+          borderColor: '#4ade80',
+          backgroundColor: 'rgba(74,222,128,0.10)',
+          fill: true,
+          tension: 0.35,
+          pointRadius: 2
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { labels: { color: '#cfcfe0' } },
+        tooltip: { callbacks: { label: c => `${c.dataset.label}: ${fmtMoney(c.parsed.y)}` } }
+      },
+      scales: {
+        x: { ticks: { color: '#8a8aa3' }, grid: { color: '#22305a' } },
+        y: { ticks: { color: '#8a8aa3', callback: v => '$' + v }, grid: { color: '#22305a' } }
+      }
+    }
+  });
+}
+
+function renderBudgetChart(trend) {
+  const ctx = document.getElementById('budgetChart').getContext('2d');
+  const labels = trend.map(d => fmtDate(d.date));
+  let acc = 0;
+  const real = trend.map(d => { acc += d.spend; return Math.round(acc * 100) / 100; });
+  const totalDays = trend.length || 1;
+  const ideal = trend.map((_, i) => Math.round((MONTHLY_BUDGET / totalDays) * (i + 1) * 100) / 100);
+
+  if (budgetChart) budgetChart.destroy();
+  budgetChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Real acumulado', data: real, borderColor: '#e94560', backgroundColor: 'rgba(233,69,96,0.15)', fill: true, tension: 0.3, pointRadius: 2 },
+        { label: 'Presupuesto ideal', data: ideal, borderColor: '#60a5fa', borderDash: [6, 4], fill: false, tension: 0.3, pointRadius: 0 }
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { labels: { color: '#cfcfe0' } },
+        tooltip: { callbacks: { label: c => `${c.dataset.label}: ${fmtMoney(c.parsed.y)}` } }
+      },
+      scales: {
+        x: { ticks: { color: '#8a8aa3' }, grid: { color: '#22305a' } },
+        y: { ticks: { color: '#8a8aa3', callback: v => '$' + v }, grid: { color: '#22305a' } }
+      }

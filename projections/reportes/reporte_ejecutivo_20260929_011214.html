@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Reporte Ejecutivo</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a1a2e;color:#e0e0e0;font-family:system-ui;padding:24px;max-width:900px;margin:0 auto}
+h1{color:#e94560;border-bottom:2px solid #e94560;padding-bottom:8px;margin-bottom:16px}
+h2{color:#e94560;margin:20px 0 8px}
+h3{color:#cc3340;margin:16px 0 6px}
+table{border-collapse:collapse;width:100%;margin:12px 0}
+th{background:#16213e;color:#e94560;padding:6px 12px;text-align:left;border-bottom:1px solid #333}
+td{padding:6px 12px;border-bottom:1px solid #222}
+tr:nth-child(even){background:#16213e}
+code{background:#0d1117;padding:2px 6px;border-radius:3px;font-size:13px}
+pre{background:#0d1117;padding:12px;border-radius:6px;overflow-x:auto}
+li{margin:4px 0}
+a{color:#e94560}
+</style></head>
+<body>
+<h1>📊 Reporte Ejecutivo — Canal WhatsApp caído por OOM + sin watchdog</h1>
+<br>
+<table>
+<tr><th><strong>Para:</strong> Gus</th><th><strong>Lectura:</strong> 2 min</th><th><strong>Estado:</strong> ⚠️ Diagnóstico completo, requiere acción</th></tr>
+<br>
+<hr>
+<br>
+<h2>🎯 TL;DR (lo que importa)</h2>
+<br>
+<li><strong>Qué pasó:</strong> El gateway de WhatsApp (masa-madre) murió <strong>2 veces en 2 días</strong> por OOM. systemd lo mató, el reinicio falló con <strong>exit 78</strong> y — por <code>RestartPreventExitStatus=78</code> — <strong>se negó a reintentar</strong>. Quedó muerto 23 min hasta que un humano lo levantó.</li>
+<li><strong>Por qué nadie se enteró:</strong> <strong>No existe watchdog</strong>. La caída fue 100% silenciosa.</li>
+<li><strong>Causa raíz (2 capas):</strong> (1) fuga de memoria hasta ~4 GiB → oomd mata el cgroup; (2) el snapshot SQLite de arranque (304 MB, budget 40 s) <strong>no cabe en el arranque real (60.3 s)</strong> → exit 78 → systemd no reintenta.</li>
+<li><strong>Lo que NO es:</strong> base corrupta, contención de procesos, disco lleno, ni el dashboard.</li>
+<br>
+<hr>
+<br>
+<h2>🔍 Hallazgos verificados</h2>
+<br>
+<tr><td>Capa</td><td>Problema</td><td>Evidencia</td></tr>
+<tr><td><strong>1 — Memoria</strong></td><td>Gateway crece a ~4 GiB; baseline 1.15 GiB a los 3 min</td><td><code>systemd-oomd: killed 62 process(es)</code> (27-sep 19:23:59)</td></tr>
+<tr><td><strong>2 — Reinicio</strong></td><td>Snapshot SQLite (304 MB) excede budget de 40 s</td><td><code>exit 78: SQLite read-only snapshot timed out after 40s</code></td></tr>
+<tr><td><strong>3 — systemd</strong></td><td><code>RestartPreventExitStatus=78</code> bloquea reintentos</td><td>Unidad quedó <code>failed</code> en silencio 18:44→19:03</td></tr>
+<tr><td><strong>4 — Observabilidad</strong></td><td><strong>Cero watchdog del gateway</strong></td><td>Cron usuario Ubuntu: 13 tareas, ninguna monitorea esto</td></tr>
+<br>
+</table>
+<p><strong>Descartado con evidencia:</strong></p>
+<li>✅ DB sana: <code>PRAGMA quick_check</code> → ok (74,185 págs × 4096 = 303.9 MB)</li>
+<li>✅ Sin contención: <code>fuser</code> vacío, sin procesos OpenClaw vivos</li>
+<li>✅ Disco OK: 55/915 GB (7%)</li>
+<li>✅ No es el dashboard (roi-dashboard.service aparte, RSS 118 MB)</li>
+<li>✅ Gateway Mac (PID 690, :18797) vivo pero <strong>NO sirve este canal</strong></li>
+<br>
+<hr>
+<br>
+<h2>🚨 Hueco crítico de observabilidad</h2>
+<br>
+<p>> <strong>No hay watchdog.</strong> El canal estuvo caído 23 min sin que nada avisara. Esto es lo que convierte un bug en un incidente.</p>
+<br>
+<hr>
+<br>
+<h2>✅ Acciones recomendadas (priorizadas)</h2>
+<br>
+<p><strong>P0 — Inmediato (hoy):</strong></p>
+<li><strong>Subir budget del snapshot</strong> de 40 s → <strong>120 s</strong> (arranque real medido: 60.3 s).</li>
+<li><strong>Quitar/ajustar <code>RestartPreventExitStatus=78</code></strong> en la unit — el 78 aquí es transitorio, no config error.</li>
+<li><strong>Watchdog mínimo:</strong> cron cada 60 s que valide <code>systemctl is-active</code> + puerto del gateway y alerte (Telegram/WhatsApp) si falla.</li>
+<br>
+<p><strong>P1 — Esta semana:</strong></p>
+<li><strong>Memory limit + restart</strong> en la unit (<code>MemoryMax=3G</code>, <code>MemoryHigh=2.5G</code>) para reciclar antes del OOM.</li>
+<li><strong>Investigar la fuga</strong> de memoria (heap dump a las 3 h de uptime).</li>
+<br>
+<p><strong>P2 — Próximas 2 semanas:</strong></p>
+<li>Alertas de <code>systemd-oomd</code> → canal de on-call.</li>
+<li>Dashboard de uptime del canal WhatsApp.</li>
+<br>
+<hr>
+<br>
+<h2>📦 Output requerido</h2>
+<br>
+<p><strong>Archivos creados/modificados:</strong></p>
+<li>⚠️ <strong>Ninguno.</strong> Este enjambre fue <strong>diagnóstico/análisis</strong> — no se modificó código ni configs. No aplica backup ni inventario de archivos tocados.</li>
+<br>
+<p><strong>Resultados concretos:</strong></p>
+<li>Causa raíz identificada en <strong>2 capas</strong> (memoria + reinicio bloqueado por exit 78).</li>
+<li><strong>4 hipótesis descartadas</strong> con evidencia (DB, contención, disco, dashboard).</li>
+<li><strong>Hueco de observabilidad confirmado:</strong> 0 watchdogs sobre el gateway.</li>
+<li><strong>Ventana de caída verificada:</strong> 28-sep 18:42:37 → 19:05:44 (23 min 7 s).</li>
+<br>
+<p><strong>Resumen ejecutivo:</strong></p>
+<p>El canal de WhatsApp cayó 23 min por OOM del gateway, y systemd no lo reintentó porque el exit 78 (timeout del snapshot SQLite de 40 s vs arranque real de 60.3 s) está en <code>RestartPreventExitStatus</code>. La base está sana y no hay contención — el problema es <strong>presupuesto de arranque mal calibrado + ausencia total de watchdog</strong>. Se recomienda subir el budget a 120 s, quitar el 78 del prevent-restart y desplegar un watchdog de 60 s como P0.</p>
+<br>
+<hr>
+<br>
+<p><strong>⚠️ Nota de honestidad (Protocolo VERIFICA):</strong> Este reporte es <strong>análisis</strong>, no ejecución de fixes. No se tocaron archivos. Si el enjambre debía <strong>aplicar</strong> los cambios (unit file, watchdog), falta esa fase — votar en consecuencia.</p>
+</body></html>

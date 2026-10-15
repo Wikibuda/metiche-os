@@ -5,6 +5,7 @@ import os from "node:os";
 import { spawn } from "node:child_process";
 import net from "node:net";
 import { fileURLToPath } from "node:url";
+import { enqueuePlaneLaunch, buildMotorStatus } from "./lib/plane-launch.mjs";
 
 const HOME = os.homedir();
 const OPENCLAW_ROOT = path.join(HOME, ".openclaw");
@@ -24,6 +25,11 @@ const METICHE_TIMEOUT_MS = Number(process.env.METICHE_TIMEOUT_MS || 4500);
 const SHOPIFY_SALES_FILE = path.join(OPENCLAW_ROOT, "workspace", "dashboard_parts", "shopify_today_simple.json");
 const DEEPSEEK_PRICING_FILE = path.join(OPENCLAW_ROOT, "workspace", "dashboard_parts", "deepseek_pricing.json");
 const GASTOS_FILE = path.join(OPENCLAW_ROOT, "workspace", "dashboard_parts", "gastos.json");
+// Issue #598 — el saldo lo escribe el fetcher del EGRESS PROXY (deepseek_balance_egress.mjs),
+// no el dashboard. Así el dashboard ya NO necesita la llave cruda en su process.env.
+const DEEPSEEK_BALANCE_FILE =
+  process.env.DEEPSEEK_BALANCE_FILE ||
+  path.join(OPENCLAW_ROOT, "workspace", "dashboard_parts", "deepseek_balance.json");
 
 const ACTIONS = {
   "prod-status": { cmd: "openclaw", args: ["daemon", "status"] },
@@ -220,13 +226,36 @@ async function safeReadJson(filePath) {
 }
 
 async function getDeepSeekBalance() {
+  // Issue #598 — FUENTE PRIMARIA: el archivo que escribe el fetcher del EGRESS PROXY.
+  // El fetcher (deepseek_balance_egress.mjs) corre como comando del gateway y deja el
+  // saldo normalizado en dashboard_parts/deepseek_balance.json. Aquí sólo lo leemos:
+  // este server ya NO requiere la llave cruda de DeepSeek en su entorno.
+  try {
+    const fromFile = await safeReadJson(DEEPSEEK_BALANCE_FILE);
+    if (fromFile && fromFile.ok === true && fromFile.total_balance != null) {
+      return {
+        ok: true,
+        total_balance: String(fromFile.total_balance),
+        granted_balance: String(fromFile.granted_balance != null ? fromFile.granted_balance : "0.00"),
+        topped_up_balance: String(fromFile.topped_up_balance != null ? fromFile.topped_up_balance : "0.00"),
+        currency: String(fromFile.currency || "USD"),
+        source: fromFile.source || "egress",
+        timestamp: fromFile.fetched_at || new Date().toISOString()
+      };
+    }
+  } catch {
+    // archivo ausente/ilegible → se intenta el fallback de abajo
+  }
+
+  // FALLBACK legacy (compatibilidad): llave cruda en el entorno + llamada directa.
+  // Con el egress proxy activo esta rama queda inerte (el plist no expone DEEPSEEK_API_KEY).
   const DEEPSEEK_TOKEN = String(process.env.DEEPSEEK_API_KEY || "").trim();
   const API_URL = "https://api.deepseek.com/user/balance";
 
   if (!DEEPSEEK_TOKEN) {
     return {
       ok: false,
-      error: "DEEPSEEK_API_KEY no configurada",
+      error: "Sin saldo en dashboard_parts/deepseek_balance.json y DEEPSEEK_API_KEY no configurada",
       timestamp: new Date().toISOString()
     };
   }
@@ -780,6 +809,61 @@ async function proxyDashboardApi(req, res, requestUrl) {
   }
 }
 
+// [consola del War Room · 2-oct-2026 · corregido #530 05-oct-2026] "Corre este issue": NO
+// ejecuta aquí. Le pide al MOTOR que corra ESE issue y el motor sigue siendo el único cerebro.
+// El motor es UNO SOLO y vive en la MAC (launchd `com.masamadre.runner` → `scripts/runner.py`,
+// verificado 05-oct-2026): el docstring viejo de `warroom_espejo.py` que decía "Ubuntu" estaba
+// desfasado y el propio `runner.py` rechaza despachar a Ubuntu («Ubuntu = solo producción»).
+// Por eso por default corre LOCAL en la Mac; si algún día el motor se muda, se apunta con el
+// env `MOTOR_SSH_HOST` (p.ej. "ubuntu-imac") sin tocar el resto. El runner respeta la pausa.
+function runIssueOnMotor(seq) {
+  const limpio = String(seq || "").trim();
+  if (!/^[0-9]{1,6}$/.test(limpio)) {
+    return Promise.resolve({ ok: false, error: "seq inválido (solo dígitos)" });
+  }
+  // Aviso por Telegram al terminar (Gus, 2-oct-2026): se lanza un vigilante en segundo plano
+  // (setsid+nohup para que sobreviva) y el motor corre en paralelo.
+  const chatAviso = process.env.AVISO_TELEGRAM_CHAT || "1230372781";
+  const vigia = "(setsid nohup python3 scripts/avisar_issue_telegram.py --seq " + limpio +
+    " --chat " + chatAviso + " >/dev/null 2>&1 &)";
+  const comando = "cd ~/.openclaw/workspace && " + vigia +
+    " && python3 scripts/runner.py --seq " + limpio + " --execute --ignorar-ventana";
+  const sshHost = String(process.env.MOTOR_SSH_HOST || "").trim();
+  const [cmd, args] = sshHost
+    ? ["ssh", ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", sshHost, comando]]
+    : ["bash", ["-lc", comando]];
+  return new Promise((resolve) => {
+    const child = spawn(cmd, args, {
+      cwd: path.join(OPENCLAW_ROOT, "workspace"), env: process.env, stdio: ["ignore", "pipe", "pipe"]
+    });
+    let out = "", err = "";
+    // NO bloqueante: el motor espera al agente (hasta ~30 min). Esperamos solo unos segundos
+    // por si falla de inmediato (ssh caído, issue inexistente, sin dueño) y, si sigue vivo,
+    // contestamos "lanzado" y lo dejamos correr: el tablero muestra el avance en vivo.
+    const ESPERA_MS = 12000;
+    let resuelto = false;
+    const terminar = (payload) => {
+      if (resuelto) return;
+      resuelto = true;
+      clearTimeout(timer);
+      try { child.unref(); } catch { /* noop */ }
+      resolve(payload);
+    };
+    const timer = setTimeout(() => {
+      terminar({ ok: true, seq: limpio, lanzado: true, salida: (out || err || "").slice(-2000) });
+    }, ESPERA_MS);
+    child.stdout.on("data", (c) => { out += c.toString(); });
+    child.stderr.on("data", (c) => { err += c.toString(); });
+    child.on("close", (code) => {
+      terminar({ ok: code === 0, seq: limpio, code, salida: (out || err || "").slice(-4000) });
+    });
+    child.on("error", (e) => {
+      clearTimeout(timer);
+      resolve({ ok: false, error: e.message });
+    });
+  });
+}
+
 const server = createServer(async (req, res) => {
   try {
     const requestUrl = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
@@ -804,6 +888,20 @@ const server = createServer(async (req, res) => {
     ) {
       const html = await loadDashboardHtml();
       sendHtml(res, html);
+      return;
+    }
+
+    // [#530] «Lanzar» por issue: ENCOLA para el motor. Va ANTES del proxy /dashboard/* porque
+    // el resto de /dashboard/ sí vive en FastAPI; esta acción es del host (escribe la cola).
+    if (req.method === "POST" && /^\/dashboard\/plane\/issues\/[0-9]{1,6}\/launch$/.test(requestUrl.pathname)) {
+      const seq = requestUrl.pathname.split("/")[4];
+      const result = await enqueuePlaneLaunch(seq);
+      sendJson(res, 200, result);
+      return;
+    }
+
+    if (req.method === "GET" && requestUrl.pathname === "/api/motor/status") {
+      sendJson(res, 200, await buildMotorStatus());
       return;
     }
 
@@ -849,6 +947,15 @@ const server = createServer(async (req, res) => {
       const taskId = typeof body.taskId === "string" ? body.taskId : "";
       const result = await runMeticheAction(action, taskId);
       sendJson(res, result.ok ? 200 : result.status || 400, result);
+      return;
+    }
+
+    if (req.method === "POST" && requestUrl.pathname === "/api/run-issue") {
+      const body = await parseRequestBody(req);
+      const result = await runIssueOnMotor(body && body.seq);
+      // SIEMPRE 200: el estado va dentro del JSON. Un 5xx del origen a través del túnel de
+      // Cloudflare se convierte en una página de error HTML y el navegador no puede leerla.
+      sendJson(res, 200, result);
       return;
     }
 

@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporte Ejecutivo — Tracking Multicanal</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #1a1a2e;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            color: #e0e0e0;
+            padding: 2rem 1.5rem;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            max-width: 1300px;
+            width: 100%;
+        }
+        h1 {
+            font-size: 2.2rem;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            margin-bottom: 0.25rem;
+            color: #ffffff;
+            border-left: 5px solid #e94560;
+            padding-left: 1.2rem;
+        }
+        .subtitle {
+            color: #a0a8c0;
+            font-size: 1rem;
+            margin-bottom: 2.5rem;
+            padding-left: 1.2rem;
+            border-left: 5px solid #e94560;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2.5rem;
+        }
+        .card {
+            background: #16213e;
+            border-radius: 20px;
+            padding: 1.5rem 1.2rem;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            border: 1px solid #2a2a4a;
+            transition: transform 0.15s ease;
+        }
+        .card:hover {
+            transform: translateY(-3px);
+            border-color: #e94560;
+        }
+        .card h3 {
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #8b92b0;
+            margin-bottom: 0.6rem;
+            font-weight: 500;
+        }
+        .card .big-number {
+            font-size: 2.6rem;
+            font-weight: 700;
+            color: #ffffff;
+            line-height: 1.1;
+        }
+        .card .big-number span {
+            font-size: 1rem;
+            font-weight: 400;
+            color: #6b7290;
+            margin-left: 0.3rem;
+        }
+        .card .trend {
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+            display: inline-block;
+            background: rgba(233,69,96,0.15);
+            padding: 0.2rem 0.8rem;
+            border-radius: 30px;
+            color: #e94560;
+        }
+        .card .trend.up { color: #4ecdc4; background: rgba(78,205,196,0.15); }
+        .card .trend.down { color: #e94560; background: rgba(233,69,96,0.15); }
+        .chart-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2.5rem;
+        }
+        .chart-card {
+            background: #16213e;
+            border-radius: 20px;
+            padding: 1.2rem 1rem 0.8rem 1rem;
+            border: 1px solid #2a2a4a;
+        }
+        .chart-card h3 {
+            font-size: 0.9rem;
+            color: #b0b8d0;
+            margin-bottom: 0.8rem;
+            padding-left: 0.3rem;
+            font-weight: 500;
+        }
+        .chart-card canvas {
+            width: 100% !important;
+            height: auto !important;
+            max-height: 220px;
+        }
+        .table-wrapper {
+            background: #16213e;
+            border-radius: 20px;
+            padding: 1rem 0.5rem 0.5rem 0.5rem;
+            border: 1px solid #2a2a4a;
+            overflow-x: auto;
+            margin-bottom: 2rem;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        th {
+            text-align: left;
+            padding: 0.8rem 1rem;
+            color: #8b92b0;
+            font-weight: 500;
+            border-bottom: 1px solid #2a2a4a;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        td {
+            padding: 0.8rem 1rem;
+            border-bottom: 1px solid #1f1f3a;
+            color: #d0d4e8;
+        }
+        tr:last-child td { border-bottom: none; }
+        .badge {
+            background: #2a2a4a;
+            padding: 0.2rem 0.7rem;
+            border-radius: 30px;
+            font-size: 0.75rem;
+            color: #b0b8d0;
+        }
+        .badge.active { background: rgba(78,205,196,0.2); color: #4ecdc4; }
+        .badge.paused { background: rgba(233,69,96,0.2); color: #e94560; }
+        .footer-note {
+            text-align: center;
+            color: #5a6080;
+            font-size: 0.8rem;
+            margin-top: 1.5rem;
+            border-top: 1px solid #1f1f3a;
+            padding-top: 1.5rem;
+        }
+        @media (max-width: 700px) {
+            .chart-row { grid-template-columns: 1fr; }
+            h1 { font-size: 1.6rem; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>📊 Tracking Multicanal · Ejecutivo</h1>
+    <div class="subtitle">Consolidado canales · Últimos 30 días · Reporte Z</div>
+
+    <!-- KPIs -->
+    <div class="grid">
+        <div class="card">
+            <h3>📥 Leads totales</h3>
+            <div class="big-number">1,284 <span>+12%</span></div>
+            <div class="trend up">▲ 8.3% vs periodo anterior</div>
+        </div>
+        <div class="card">
+            <h3>📞 Contactos</h3>
+            <div class="big-number">847 <span>66%</span></div>
+            <div class="trend up">▲ tasa conversión lead→contacto</div>
+        </div>
+        <div class="card">
+            <h3>✅ Oportunidades</h3>
+            <div class="big-number">312 <span>24.3%</span></div>
+            <div class="trend up">▲ 5.2% vs periodo anterior</div>
+        </div>
+        <div class="card">
+            <h3>💰 Ingreso estimado</h3>
+            <div class="big-number">$94.6k <span>USD</span></div>
+            <div class="trend up">▲ pipeline activo</div>
+        </div>
+    </div>
+
+    <!-- Gráficos dobles -->
+    <div class="chart-row">
+        <div class="chart-card">
+            <h3>📈 Leads por canal (últimos 7 días)</h3>
+            <canvas id="chartLeads"></canvas>
+        </div>
+        <div class="chart-card">
+            <h3>🎯 Tasa de conversión por canal</h3>
+            <canvas id="chartConversion"></canvas>
+        </div>
+    </div>
+
+    <!-- Tabla multicanal -->
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>Canal</th>
+                    <th>Leads</th>
+                    <th>Contactos</th>
+                    <th>Oportunidades</th>
+                    <th>Ingreso estimado</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>📧 Email</strong></td>
+                    <td>412</td>
+                    <td>298</td>
+                    <td>112</td>
+                    <td>$34.2k</td>
+                    <td><span class="badge active">activo</span></td>
+                </tr>
+                <tr>
+                    <td><strong>📱 SMS</strong></td>
+                    <td>207</td>
+                    <td>134</td>
+                    <td>48</td>
+                    <td>$12.8k</td>
+                    <td><span class="badge active">activo</span></td>
+                </tr>
+                <tr>
+                    <td><strong>💬 WhatsApp</strong></td>
+                    <td>356</td>
+                    <td>267</td>
+                    <td>98</td>
+                    <td>$29.5k</td>
+                    <td><span class="badge active">activo</span></td>
+                </tr>
+                <tr>
+                    <td><strong>📞 Call center</strong></td>
+                    <td>189</td>
+                    <td>112</td>
+                    <td>38</td>
+                    <td>$11.1k</td>
+                    <td><span class="badge paused">pausado</span></td>
+                </tr>
+                <tr>
+                    <td><strong>🌐 Web / chat</strong></td>
+                    <td>120</td>
+                    <td>36</td>
+                    <td>16</td>
+                    <td>$7.0k</td>
+                    <td><span class="badge active">activo</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Archivo generado (información de salida) -->
+    <div style="background: #0f1a2e; border-radius: 16px; padding: 1rem 1.5rem; border: 1px solid #2a2a4a; margin-top: 0.5rem;">
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.8rem;">
+            <span style="color: #8b92b0; font-size: 0.85rem;">📁 <strong style="color:#c0c8e0;">reporte-tracking-multicanal.html</strong> · generado: <span id="timestamp"></span></span>
+            <span style="color: #6b7290; font-size: 0.75rem;">✔ datos simulados · multicanal · vZ.1</span>
+        </div>
+    </div>
+    <div class="footer-note">
+        Reporte ejecutivo tracking multicanal · archivo HTML autocontenido · Chart.js · fondo oscuro
+    </div>
+</div>
+
+<script>
+    (function() {
+        // Timestamp
+        const now = new Date();
+        document.getElementById('timestamp').textContent = now.toISOString().slice(0, 19).replace('T', ' ');
+
+        // ---------- GRÁFICO 1: leads por canal (últimos 7 días) ----------
+        const ctx1 = document.getElementById('chartLeads').getContext('2d');
+        new Chart(ctx1, {
+            type: 'bar',
+            data: {
+                labels: ['Email', 'SMS', 'WhatsApp', 'Call center', 'Web/chat'],
+                datasets: [{
+                    label: 'Leads (7d)',
+                    data: [98, 47, 82, 41, 29],
+                    backgroundColor: ['#e94560', '#4ecdc4', '#f9ca24', '#6c5ce7', '#fd79a8'],
+                    borderRadius: 6,
+                    borderSkipped: false,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: '#2a2a4a' },
+                        ticks: { color: '#8b92b0' }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#b0b8d0' }
+                    }
+                }
+            }
+        });
+
+        // ---------- GRÁFICO 2: tasa de conversión por canal ----------
+        const ctx2 = document.getElementById('chartConversion').getContext('2d');
+        new Chart(ctx2, {
+            type: 'doughnut',
+            data: {
+                labels: ['Email 27%', 'SMS 23%', 'WhatsApp 28%', 'Call center 20%', 'Web/chat 13%'],
+                datasets: [{
+                    data: [27, 23, 28, 20, 13],
+                    backgroundColor: ['#e94560', '#4ecdc4', '#f9ca24', '#6c5ce7', '#fd79a8'],
+                    borderWidth: 0,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                cutout: '65%',
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { color: '#b0b8d0', padding: 12, usePointStyle: true, pointStyle: 'circle' }
+                    }
+                }
+            }
+        });
+    })();
+</script>
+
+<!--
+Archivos creados/modificados:
+- reporte-tracking-multicanal.html (este archivo)
+
+Resultados concretos:
+- Dashboard HTML ejecutivo con 4 tarjetas KPI, 2 gráficos (barras + doughnut), tabla multicanal con 5 canales.
+- Datos simulados representativos: leads totales 1,284, contactos 847, oportunidades 312, ingreso estimado $94.6k.
+- Tracking multicanal: Email, SMS, WhatsApp, Call center, Web/chat con indicadores de estado.
+
+Resumen ejecutivo:
+Se generó un reporte HTML autónomo con tracking multicanal, incluyendo KPIs, gráficos dinámicos (Chart.js) y tabla detallada por canal. El diseño usa fondo oscuro (#1a1a2e), tarjetas (#16213e) y acentos (#e94560). El archivo está listo para visualización ejecutiva inmediata.
+-->
+</body>
+</html>

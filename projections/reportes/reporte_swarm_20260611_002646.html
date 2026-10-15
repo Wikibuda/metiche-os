@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporte Ejecutivo — Tracking Multicanal</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #1a1a2e;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            color: #e0e0e0;
+            padding: 2rem 1.5rem;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        h1 {
+            font-size: 2.2rem;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            margin-bottom: 0.25rem;
+            color: #ffffff;
+        }
+        .subtitle {
+            color: #a0a8c0;
+            font-size: 1rem;
+            margin-bottom: 2rem;
+            border-left: 4px solid #e94560;
+            padding-left: 1rem;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .card {
+            background: #16213e;
+            border-radius: 20px;
+            padding: 1.5rem 1.25rem;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            border: 1px solid rgba(233,69,96,0.15);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 32px rgba(233,69,96,0.2);
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        .card-header h3 {
+            font-size: 1rem;
+            font-weight: 500;
+            color: #a0a8c0;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .card-header .badge {
+            background: #e94560;
+            color: #fff;
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 0.2rem 0.7rem;
+            border-radius: 30px;
+        }
+        .metric-value {
+            font-size: 2.4rem;
+            font-weight: 700;
+            color: #ffffff;
+            line-height: 1.1;
+        }
+        .metric-sub {
+            font-size: 0.85rem;
+            color: #7a82a0;
+            margin-top: 0.3rem;
+        }
+        .trend-up { color: #2ecc71; }
+        .trend-down { color: #e74c3c; }
+        .trend-neutral { color: #f1c40f; }
+        .chart-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .chart-card {
+            background: #16213e;
+            border-radius: 20px;
+            padding: 1.5rem 1.25rem 1rem;
+            border: 1px solid rgba(233,69,96,0.15);
+        }
+        .chart-card h3 {
+            font-size: 1rem;
+            font-weight: 500;
+            color: #a0a8c0;
+            margin-bottom: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .chart-container {
+            position: relative;
+            height: 220px;
+            width: 100%;
+        }
+        .table-section {
+            background: #16213e;
+            border-radius: 20px;
+            padding: 1.5rem 1.25rem;
+            border: 1px solid rgba(233,69,96,0.15);
+            margin-bottom: 2rem;
+            overflow-x: auto;
+        }
+        .table-section h3 {
+            font-size: 1rem;
+            font-weight: 500;
+            color: #a0a8c0;
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        th {
+            text-align: left;
+            padding: 0.75rem 0.5rem 0.5rem 0.5rem;
+            color: #7a82a0;
+            font-weight: 500;
+            border-bottom: 1px solid #2a2a4a;
+        }
+        td {
+            padding: 0.65rem 0.5rem;
+            border-bottom: 1px solid #1f1f3a;
+            color: #d0d4e0;
+        }
+        td:first-child { font-weight: 500; color: #ffffff; }
+        .highlight { color: #e94560; font-weight: 600; }
+        .footer {
+            text-align: center;
+            color: #5a6280;
+            font-size: 0.8rem;
+            padding-top: 1rem;
+            border-top: 1px solid #1f1f3a;
+            margin-top: 1rem;
+        }
+        .footer span { color: #e94560; }
+        @media (max-width: 800px) {
+            .chart-row { grid-template-columns: 1fr; }
+            .grid { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 500px) {
+            .grid { grid-template-columns: 1fr; }
+            body { padding: 1rem; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>📊 Tracking Multicanal</h1>
+    <div class="subtitle">Reporte ejecutivo · consolidado canales · archivo generado: <span id="filenameDisplay" style="color:#e94560;">reporte_multicanal_2025-04-10.html</span></div>
+
+    <!-- KPI cards -->
+    <div class="grid">
+        <div class="card">
+            <div class="card-header">
+                <h3>Impresiones totales</h3>
+                <span class="badge">+12.3%</span>
+            </div>
+            <div class="metric-value">2.84M</div>
+            <div class="metric-sub"><span class="trend-up">▲</span> vs periodo anterior · 2.53M</div>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <h3>Clics totales</h3>
+                <span class="badge">+8.7%</span>
+            </div>
+            <div class="metric-value">142.3K</div>
+            <div class="metric-sub"><span class="trend-up">▲</span> vs periodo anterior · 130.9K</div>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <h3>CTR global</h3>
+                <span class="badge">5.01%</span>
+            </div>
+            <div class="metric-value">5.01%</div>
+            <div class="metric-sub"><span class="trend-neutral">◆</span> objetivo: 4.8% · superado</div>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <h3>Conversiones</h3>
+                <span class="badge">+15.2%</span>
+            </div>
+            <div class="metric-value">8.947</div>
+            <div class="metric-sub"><span class="trend-up">▲</span> vs periodo anterior · 7.768</div>
+        </div>
+    </div>
+
+    <!-- Charts row -->
+    <div class="chart-row">
+        <div class="chart-card">
+            <h3>📱 Rendimiento por canal</h3>
+            <div class="chart-container">
+                <canvas id="canalChart"></canvas>
+            </div>
+        </div>
+        <div class="chart-card">
+            <h3>📈 Evolución semanal (últimas 6 semanas)</h3>
+            <div class="chart-container">
+                <canvas id="trendChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla detalle canales -->
+    <div class="table-section">
+        <h3>📋 Desglose por canal · tracking multicanal</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Canal</th>
+                    <th>Impresiones</th>
+                    <th>Clics</th>
+                    <th>CTR</th>
+                    <th>Conversiones</th>
+                    <th>Coste (€)</th>
+                    <th>CPA (€)</th>
+                </tr>
+            </thead>
+            <tbody id="tablaCanales">
+                <!-- se llena desde JS -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- archivo generado -->
+    <div style="background:#0f1a2e; border-radius:16px; padding:1rem 1.5rem; border:1px solid #2a2a4a; margin-bottom:1.5rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.5rem;">
+        <span style="color:#a0a8c0;">📁 <span style="color:#e0e0e0; font-weight:500;">Archivo generado:</span> <code style="background:#1a1a2e; padding:0.2rem 0.6rem; border-radius:8px; color:#e94560;">reporte_multicanal_2025-04-10.html</code></span>
+        <span style="color:#5a6280; font-size:0.85rem;">🕒 actualizado: <span id="timestampSpan">2025-04-10 14:32 UTC</span></span>
+    </div>
+
+    <div class="footer">
+        <span>✦</span> Reporte ejecutivo tracking multicanal · datos simulados con tendencias reales <span>✦</span>
+    </div>
+</div>
+
+<script>
+    (function() {
+        // ----- DATOS DE EJEMPLO (multicanal) -----
+        const canales = [
+            { nombre: 'Google Ads', impresiones: 1240000, clics: 68200, conversiones: 4120, coste: 28450 },
+            { nombre: 'Meta Ads', impresiones: 980000, clics: 44100, conversiones: 2890, coste: 19200 },
+            { nombre: 'LinkedIn', impresiones: 320000, clics: 14400, conversiones: 870, coste: 12400 },
+            { nombre: 'TikTok', impresiones: 210000, clics: 10500, conversiones: 620, coste: 5800 },
+            { nombre: 'Email', impresiones: 89000, clics: 5100, conversiones: 447, coste: 1200 }
+        ];
+
+        // calcular totales
+        const totalImp = canales.reduce((s, c) => s + c.impresiones, 0);
+        const totalClics = canales.reduce((s, c) => s + c.clics, 0);
+        const totalConv = canales.reduce((s, c) => s + c.conversiones, 0);
+        const totalCoste = canales.reduce((s, c) => s + c.coste, 0);
+        const ctrGlobal = (totalClics / totalImp * 100).toFixed(2);
+
+        // actualizar métricas en las cards (ya están hardcoded, pero por si acaso)
+        // No reemplazamos porque ya están como ejemplo, pero podríamos actualizar dinámicamente
+        // Preferimos mantener consistencia con los datos reales de la tabla
+        document.querySelectorAll('.metric-value')[0].textContent = (totalImp / 1000000).toFixed(2) + 'M';
+        document.querySelectorAll('.metric-value')[1].textContent = (totalClics / 1000).toFixed(1) + 'K';
+        document.querySelectorAll('.metric-value')[2].textContent = ctrGlobal + '%';
+        document.querySelectorAll('.metric-value')[3].textContent = totalConv.toLocaleString();
+
+        // ----- TABLA -----
+        const tbody = document.getElementById('tablaCanales');
+        tbody.innerHTML = '';
+        canales.forEach(c => {
+            const ctr = (c.clics / c.impresiones * 100).toFixed(2);
+            const cpa = (c.conversiones > 0 ? (c.coste / c.conversiones) : 0).toFixed(2);
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${c.nombre}</td>
+                <td>${c.impresiones.toLocaleString()}</td>
+                <td>${c.clics.toLocaleString()}</td>
+                <td>${ctr}%</td>
+                <td>${c.conversiones.toLocaleString()}</td>
+                <td>${c.coste.toLocaleString()}</td>
+                <td>${cpa}€</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        // ----- GRÁFICO CANAL (barras) -----
+        const ctx1 = document.getElementById('canalChart').getContext('2d');
+        new Chart(ctx1, {
+            type: 'bar',
+            data: {
+                labels: canales.map(c => c.nombre),
+                datasets: [
+                    {
+                        label: 'Impresiones (miles)',
+                        data: canales.map(c => +(c.impresiones / 1000).toFixed(0)),
+                        backgroundColor: '#e94560',
+                        borderRadius: 6,
+                        barPercentage: 0.6,
+                        order: 2
+                    },
+                    {
+                        label: 'Clics (miles)',
+                        data: canales.map(c => +(c.clics / 1000).toFixed(1)),
+                        backgroundColor: '#2ecc71',
+                        borderRadius: 6,
+                        barPercentage: 0.6,
+                        order: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: { color: '#a0a8c0', font: { size: 11 } }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: '#7a82a0', font: { size: 10 } },
+                        grid: { color: '#2a2a4a' }
+                    },
+                    y: {
+                        ticks: { color: '#7a82a0', font: { size: 10 } },
+                        grid: { color: '#2a2a4a' }
+                    }
+                }
+            }
+        });
+
+        // ----- GRÁFICO EVOLUCIÓN SEMANAL (líneas) -----
+        const ctx2 = document.getElementById('trendChart').getContext('2d');
+        const semanas = ['Sem 10', 'Sem 11', 'Sem 12', 'Sem 13', 'Sem 14', 'Sem 15'];
+        // datos simulados con tendencia creciente
+        const impTrend = [2100, 2250, 2400, 2580, 2700, 2840]; // miles
+        const clicsTrend = [118, 124, 131, 137, 140, 142]; // miles
+        const convTrend = [6.2, 6.8, 7.3, 7.9, 8.4, 8.9]; // miles
+
+        new Chart(ctx2, {
+            type: 'line',
+            data: {
+                labels: semanas,
+                datasets: [
+                    {
+                        label: 'Impresiones (miles)',
+                        data: impTrend,
+                        borderColor: '#e94560',
+                        backgroundColor: 'rgba(233,69,96,0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#e94560',
+                        borderWidth: 2
+                    },
+                    {
+                        label: 'Clics (miles)',
+                        data: clicsTrend,
+                        borderColor: '#2ecc71',
+                        backgroundColor: 'rgba(46,204,113,0.05)',
+                        fill: false,
+                        tension: 0.3,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#2ecc71',
+                        borderWidth: 2,
+                        yAxisID: 'y1'
+                    },
+                    {
+                        label: 'Conversiones (miles)',
+                        data: convTrend,
+                        borderColor: '#f1c40f',
+                        backgroundColor: 'rgba(241,196,15,0.05)',
+                        fill: false,
+                        tension: 0.3,
+                        pointRadius

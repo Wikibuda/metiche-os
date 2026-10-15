@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Reporte Ejecutivo</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a1a2e;color:#e0e0e0;font-family:system-ui;padding:24px;max-width:900px;margin:0 auto}
+h1{color:#e94560;border-bottom:2px solid #e94560;padding-bottom:8px;margin-bottom:16px}
+h2{color:#e94560;margin:20px 0 8px}
+h3{color:#cc3340;margin:16px 0 6px}
+table{border-collapse:collapse;width:100%;margin:12px 0}
+th{background:#16213e;color:#e94560;padding:6px 12px;text-align:left;border-bottom:1px solid #333}
+td{padding:6px 12px;border-bottom:1px solid #222}
+tr:nth-child(even){background:#16213e}
+code{background:#0d1117;padding:2px 6px;border-radius:3px;font-size:13px}
+pre{background:#0d1117;padding:12px;border-radius:6px;overflow-x:auto}
+li{margin:4px 0}
+a{color:#e94560}
+</style></head>
+<body>
+<h1>📊 Reporte Ejecutivo — Canal WhatsApp caído por OOM + sin watchdog</h1>
+<br>
+<p><strong>Para:</strong> Gus · <strong>Lectura:</strong> 2 min · <strong>Estado:</strong> ⚠️ Diagnóstico completo, <strong>acción pendiente de ejecución</strong></p>
+<br>
+<hr>
+<br>
+<h2>🎯 TL;DR (lo que importa)</h2>
+<br>
+<li><strong>Qué pasó:</strong> El gateway de WhatsApp (masa-madre) murió <strong>2 veces en 2 días</strong> por OOM. El reinicio automático <strong>falló por diseño</strong>: la unit tiene <code>RestartPreventExitStatus=78</code> y el arranque sale con exit 78 cuando el snapshot SQLite excede 40 s.</li>
+<li><strong>Por qué duró 23 min:</strong> <strong>No hay watchdog</strong>. Nadie avisó. Gus lo notó a ojo.</li>
+<li><strong>Causa raíz doble:</strong> (1) fuga de memoria hasta ~4 GiB → systemd-oomd mata el cgroup; (2) el presupuesto de snapshot (40 s) es <strong>más corto que el arranque real (60.3 s)</strong> → exit 78 → systemd no reintenta.</li>
+<li><strong>Lo que NO es:</strong> base corrupta (quick_check ok), contención de procesos (fuser vacío), disco (7% usado), dashboard (corre aparte).</li>
+<br>
+<hr>
+<br>
+<h2>🔍 Hallazgos verificados</h2>
+<br>
+<table>
+<tr><th>Capa</th><th>Problema</th><th>Evidencia</th></tr>
+<tr><td><strong>1 — Memoria</strong></td><td>Gateway crece a ~4 GiB, oomd mata cgroup</td><td>journal 27-sep 19:23:59 y 28-sep 18:42:37</td></tr>
+<tr><td><strong>2 — Reinicio</strong></td><td>Exit 78 → systemd no reintenta</td><td><code>RestartPreventExitStatus=78</code> en unit</td></tr>
+<tr><td><strong>3 — Timeout</strong></td><td>Snapshot 40 s < arranque 60.3 s</td><td>log 18:44:12 vs 19:05:44</td></tr>
+<tr><td><strong>4 — Observabilidad</strong></td><td>Cero watchdog del gateway</td><td>cron Ubuntu: 13 tareas, ninguna lo cubre</td></tr>
+<br>
+<hr>
+<br>
+<h2>🛠️ Plan de acción propuesto (aditivo, sin romper nada)</h2>
+<br>
+</table>
+<p><strong>Prioridad 1 — Desbloquear el reinicio (5 min)</strong></p>
+<li>Quitar <code>78</code> de <code>RestartPreventExitStatus</code> <strong>o</strong> subir el budget del snapshot de 40 s → <strong>90 s</strong>.</li>
+<li>Backup de la unit antes: <code>cp /etc/systemd/system/<gateway>.service{,.bak-$(date +%F)}</code>.</li>
+<br>
+<p><strong>Prioridad 2 — Watchdog real (30 min)</strong></p>
+<li>Script <code>~/.openclaw/bin/watchdog-whatsapp.sh</code>:</li>
+<li>Chequea <code>systemctl is-active</code> + puerto + última actividad del canal.</li>
+<li>Si <code>failed</code> o sin tráfico >5 min → <code>reset-failed</code> + <code>start</code> + alerta.</li>
+<li>Cron cada 2 min. Log en <code>~/.openclaw/logs/watchdog.log</code>.</li>
+<br>
+<p><strong>Prioridad 3 — Fuga de memoria (investigación)</strong></p>
+<li>Baseline 1.15 GiB a los 3 min → 4 GiB antes del OOM. Medir con <code>systemd-cgtop</code> / heap snapshot.</li>
+<li>Considerar <code>MemoryMax=</code> en la unit para forzar reinicio limpio antes del OOM global.</li>
+<br>
+<hr>
+<br>
+<h2>📦 Output requerido</h2>
+<br>
+<li><strong>Archivos creados/modificados:</strong> ❌ <strong>NINGUNO</strong> — este enjambre entregó <strong>diagnóstico</strong>, no ejecución.</li>
+<li><strong>Resultados concretos:</strong></li>
+<li>Causa raíz confirmada en 2 capas (memoria + reinicio bloqueado por exit 78).</li>
+<li>Hueco de observabilidad identificado: <strong>0 watchdogs</strong> sobre el gateway.</li>
+<li>Datos duros: 23 min de caída, 4 GiB pico, 60.3 s arranque real vs 40 s budget.</li>
+<li><strong>Resumen ejecutivo:</strong> El canal se cayó por OOM y <strong>no se recuperó solo porque la unit prohíbe reintentar en exit 78</strong>, que es exactamente el error que da el snapshot SQLite cuando tarda más que el arranque real. Sin watchdog, la caída fue silenciosa. <strong>Falta ejecutar los 3 fixes propuestos</strong> (unit + watchdog + investigación de fuga).</li>
+<br>
+<hr>
+<br>
+<h2>⚠️ Voto sugerido: **REJECT**</h2>
+<br>
+<p><strong>Motivo:</strong> El contrato exige *output verificable* (archivos, rutas, cambios aplicados). Este reporte es <strong>solo diagnóstico</strong> — no se modificó la unit, no se creó el watchdog, no hay smoke test. Cumple VERIFICA (evidencia sólida) pero <strong>no cumple las reglas duras de entrega</strong>.</p>
+<br>
+<p><strong>Para aceptar, falta:</strong></p>
+<li>Backup + edición de la unit (quitar 78 o subir budget).</li>
+<li>Crear <code>watchdog-whatsapp.sh</code> + entrada cron.</li>
+<li><code>systemctl daemon-reload</code> + smoke test (matar gateway a propósito y verificar auto-recuperación).</li>
+<li>Reporte con rutas exactas y logs del test.</li>
+<br>
+<p>¿Autorizas ejecutar los 3 fixes ahora?</p>
+</body></html>

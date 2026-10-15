@@ -193,6 +193,8 @@
       font-size: 12px;
     }
     .conversation-section { margin-top: 12px; }
+    /* Gus 6-oct-2026: mostrar ~7 items y el resto con scroll; lo del dia a lo mucho. */
+    #conv-list { max-height: 780px; overflow-y: auto; padding-right: 4px; }
     .conversation-controls { display: grid; grid-template-columns: 1.2fr 1fr 1fr 0.8fr 0.8fr 120px 140px; gap: 8px; margin-bottom: 8px; }
     .conversation-item {
       border: 1px solid var(--border);
@@ -239,6 +241,38 @@
       margin-bottom: 3px;
     }
     .plane-section { margin-top: 12px; }
+    .carril-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(190px, 1fr));
+      gap: 8px;
+      margin-top: 8px;
+    }
+    @media (max-width: 1100px) { .carril-grid { grid-template-columns: repeat(2, minmax(170px, 1fr)); } }
+    @media (max-width: 640px) { .carril-grid { grid-template-columns: 1fr; } }
+    .carril-col {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px;
+      background: rgba(255, 255, 255, 0.02);
+      min-width: 0;
+    }
+    .carril-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      text-transform: capitalize;
+    }
+    .carril-head .count { color: var(--muted); font-weight: 400; }
+    .carril-negocio { border-top: 3px solid #2dd36f; }
+    .carril-roi { border-top: 3px solid #ffd166; }
+    .carril-operacion { border-top: 3px solid #6ea8fe; }
+    .carril-archivo { border-top: 3px solid #8b8f98; }
+    .carril-acciones { display: flex; gap: 6px; flex-wrap: wrap; }
+    .carril-acciones button { width: auto; padding: 3px 10px; font-size: 11px; }
     .plane-item {
       border: 1px solid var(--border);
       border-radius: 8px;
@@ -459,7 +493,7 @@
           <div id="chronicles-list"></div>
         </div>
         <div class="conversation-section">
-          <h2>Conversaciones WhatsApp (Masa Madre)</h2>
+          <h2>Conversaciones · WhatsApp + Telegram (Masa Madre)</h2>
           <div class="conversation-controls">
             <input id="conv-search" placeholder="Buscar por client_key o texto" />
             <input id="conv-phone" placeholder="Telefono (ej. +521...)" />
@@ -474,6 +508,7 @@
         </div>
         <div class="plane-section">
           <h2>Issues Plane Relacionados</h2>
+          <div class="small" id="plane-motor">Motor: consultando...</div>
           <div class="small" id="plane-meta">Cargando issues de Plane...</div>
           <div id="plane-list"></div>
         </div>
@@ -873,45 +908,121 @@
       });
     }
 
-    function renderPlaneIssues(response) {
-      const host = qs("plane-list");
-      const items = response?.items || [];
-      qs("plane-meta").textContent = `Issues relacionados: ${response?.total || 0}`;
-      if (!items.length) {
-        host.innerHTML = '<div class="small">Sin issues relacionados por ahora.</div>';
-        return;
-      }
-      host.innerHTML = items.map((item) => {
-        const issueId = escapeHtml(item.issue_id || "-");
-        const syncStatus = escapeHtml(item.sync_status || "-");
-        const stateLabel = escapeHtml(item.issue_state || "-");
-        const taskRef = item.task_id
-          ? `${escapeHtml(item.task_title || "(sin título)")} · ${escapeHtml(item.task_id)}`
-          : "Sin tarea local vinculada";
-        const labels = Array.isArray(item.labels) && item.labels.length ? item.labels.join(", ") : "-";
-        const issueUrl = item.issue_url ? String(item.issue_url) : "";
-        const openBtn = issueUrl
-          ? `<button class="secondary" data-plane-url="${escapeHtml(issueUrl)}" style="width:auto;">Abrir</button>`
-          : `<span class="small">Sin URL</span>`;
-        return `
-          <div class="plane-item">
-            <div class="head">
-              <div><strong>${issueId}</strong></div>
-              ${openBtn}
-            </div>
-            <div class="small">sync: ${syncStatus} · state: ${stateLabel}</div>
-            <div class="small">labels: ${escapeHtml(labels)}</div>
-            <div class="small">task: ${taskRef}</div>
-            <div class="small">último sync: ${fmtDate(item.last_synced_at)} · swarm: ${escapeHtml(item.last_swarm_id || "-")}</div>
+    const CARRIL_ORDEN = ["negocio", "roi", "operacion", "archivo"];
+    const CARRIL_ICONO = { negocio: "💰", roi: "💸", operacion: "🔧", archivo: "🗄️" };
+
+    function planeItemHtml(item) {
+      const seq = item.plane_seq;
+      const title = escapeHtml(item.task_title || item.issue_title || "(sin título)");
+      const stateLabel = escapeHtml(item.issue_state || "-");
+      const carril = escapeHtml(item.carril || "-");
+      const motivo = escapeHtml(item.carril_motivo || "");
+      const labels = Array.isArray(item.labels) && item.labels.length ? item.labels.join(", ") : "—";
+      const issueUrl = item.issue_url ? String(item.issue_url) : "";
+      const openBtn = issueUrl
+        ? `<button class="secondary" data-plane-url="${escapeHtml(issueUrl)}" style="width:auto;">Abrir</button>`
+        : "";
+      const launchBtn = (!item.closed && seq)
+        ? `<button class="secondary" data-plane-launch="${seq}" style="width:auto;" title="Encola el issue para el motor (no lo ejecuta aquí)">▶ Lanzar</button>`
+        : "";
+      return `
+        <div class="plane-item">
+          <div class="head">
+            <div><strong>#${seq != null ? seq : "?"}</strong> <span class="small">${stateLabel}</span></div>
+            <div class="carril-acciones">${openBtn}${launchBtn}</div>
           </div>
-        `;
-      }).join("");
+          <div class="small">${title}</div>
+          <div class="small">carril: ${carril}${motivo ? " · " + motivo : ""}</div>
+          <div class="small">labels: ${escapeHtml(labels)}</div>
+          <div class="small">sync: ${escapeHtml(item.sync_status || "-")} · ${fmtDate(item.last_synced_at)}</div>
+        </div>`;
+    }
+
+    function bindPlaneItemEvents(host) {
       host.querySelectorAll("[data-plane-url]").forEach((btn) => {
         btn.addEventListener("click", () => {
           const raw = btn.getAttribute("data-plane-url") || "";
           if (raw) window.open(raw, "_blank");
         });
       });
+      host.querySelectorAll("[data-plane-launch]").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const seq = btn.getAttribute("data-plane-launch");
+          const original = btn.textContent;
+          btn.disabled = true;
+          btn.textContent = "Lanzando…";
+          try {
+            const resp = await postJson(`/dashboard/plane/issues/${encodeURIComponent(seq)}/launch`, {});
+            if (resp?.queued || resp?.ya_encolado) {
+              btn.textContent = resp?.ya_encolado ? "✅ Ya estaba" : "✅ Encolado";
+            } else {
+              btn.textContent = "❌ error";
+            }
+            if (resp?.nota) console.info(`[War Room] ${resp.nota}`);
+          } catch (error) {
+            btn.textContent = "❌ error";
+            console.error("No pude lanzar el issue", seq, error);
+          } finally {
+            setTimeout(() => {
+              btn.disabled = false;
+              btn.textContent = original;
+            }, 2600);
+          }
+        });
+      });
+    }
+
+    function renderMotorStatus(status) {
+      const el = qs("plane-motor");
+      if (!el) return;
+      if (!status || status.ok === false) {
+        el.textContent = "Motor: sin datos";
+        return;
+      }
+      const estado = status.pausado ? "⏸ EN PAUSA" : "▶ activo";
+      const pilas = status.pilas ? "4 pilas ON" : "4 pilas OFF";
+      const extra = status.pausado ? " · encenderlo es decisión de Gus/Orquestador" : "";
+      el.textContent = `Motor: ${estado} · ${pilas}${extra}`;
+    }
+
+    function renderPlaneIssues(response) {
+      const host = qs("plane-list");
+      const items = response?.items || [];
+      const carriles = response?.carriles || null;
+      const total = response?.total || items.length;
+      const abiertos = typeof response?.abiertos === "number" ? response.abiertos : null;
+      qs("plane-meta").textContent = abiertos === null
+        ? `Issues Plane relacionados: ${total}`
+        : `Issues Plane relacionados: ${total} · compitiendo por turno (4 pilas): ${abiertos}`;
+
+      if (!items.length && !carriles) {
+        host.className = "";
+        host.innerHTML = '<div class="small">Sin issues relacionados por ahora.</div>';
+        return;
+      }
+
+      if (carriles) {
+        host.className = "carril-grid";
+        const orden = Array.isArray(response?.orden_carriles) && response.orden_carriles.length
+          ? response.orden_carriles
+          : CARRIL_ORDEN;
+        host.innerHTML = orden.map((carril) => {
+          const lista = carriles[carril] || [];
+          const cuerpo = lista.length
+            ? lista.map(planeItemHtml).join("")
+            : '<div class="small">— vacío —</div>';
+          const icono = CARRIL_ICONO[carril] || "•";
+          return `
+            <div class="carril-col carril-${escapeHtml(carril)}">
+              <div class="carril-head"><span>${icono} ${escapeHtml(carril)}</span><span class="count">${lista.length}</span></div>
+              ${cuerpo}
+            </div>`;
+        }).join("");
+      } else {
+        host.className = "";
+        host.innerHTML = items.map(planeItemHtml).join("");
+      }
+      bindPlaneItemEvents(host);
     }
 
     async function refreshMemory(force = false) {
@@ -944,8 +1055,13 @@
       const query = qs("conv-search").value.trim();
       const phone = qs("conv-phone").value.trim();
       const customerName = qs("conv-customer-name").value.trim();
-      const dateFrom = qs("conv-date-from").value.trim();
-      const dateTo = qs("conv-date-to").value.trim();
+      const hoy = new Date().toISOString().slice(0, 10);
+      // Si se busca algo concreto (teléfono, texto o nombre), NO acotar a hoy:
+      // eso ocultaba el histórico recuperado del respaldo (#579). Sin filtro se
+      // conserva la vista ligera de «hoy».
+      const enfocado = Boolean(phone || query || customerName);
+      const dateFrom = qs("conv-date-from").value.trim() || (enfocado ? "" : hoy);
+      const dateTo = qs("conv-date-to").value.trim() || (enfocado ? "" : hoy);
       if (query) params.set("q", query);
       if (phone) params.set("phone", phone);
       if (customerName) params.set("customer_name", customerName);
@@ -1172,12 +1288,13 @@
       const statsUrl = `/dashboard/stats?retrying_threshold_minutes=${state.retryingThreshold}&blocking_threshold=${state.blockingThreshold}`;
       const tasksUrl = `/dashboard/tasks?${query}`;
       try {
-        const [stats, tasksResp, validatorsResp, narrativesResp, planeIssuesResp, conversationsResp] = await Promise.all([
+        const [stats, tasksResp, validatorsResp, narrativesResp, planeIssuesResp, motorStatus, conversationsResp] = await Promise.all([
           fetchJson(statsUrl),
           fetchJson(tasksUrl),
           fetchJson("/dashboard/validators"),
           fetchJson("/dashboard/recent-narratives?limit=8"),
           fetchJson("/dashboard/plane/issues?limit=40"),
+          fetchJson("/api/motor/status").catch(() => null),
           (() => {
             const params = new URLSearchParams();
             const query = qs("conv-search").value.trim();
@@ -1204,6 +1321,7 @@
         renderConversations(conversationsResp);
         state.planeIssues = planeIssuesResp.items || [];
         renderPlaneIssues(planeIssuesResp);
+        renderMotorStatus(motorStatus);
         await refreshMemory(false);
         if (state.selectedTaskId) {
           const stillExists = state.tasks.find((item) => item.task_id === state.selectedTaskId);

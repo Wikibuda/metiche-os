@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timedelta
 from typing import Any
 from uuid import uuid4
@@ -12,12 +13,19 @@ from app.core.config import settings
 from app.domain.narrative.service import list_recent_narratives
 from app.domain.tasks.models import QueueEntry, Task, Validation
 from app.domain.tasks.service import build_operational_overview, derive_queue_bucket, normalize_priority, run_task_flow
+from app.services import carriles
 from app.services.channel_memory_service import ChannelMemoryService
 from app.services.plane_bridge_service import list_plane_related_issues
 
 BOARD_STATUSES = ("queued", "running", "retrying", "failed", "done")
 VALIDATOR_CHANNELS = ("telegram", "whatsapp", "shopify", "dashboard", "deepseek")
 CHANNEL_STATUS_SUPPORTED = ("whatsapp", "telegram")
+
+# Enlace BUENO de Plane (verificado 05-oct-2026): `/browse/MASAM-<seq>/`.
+# El viejo `/projects/<uuid>/issues/<uuid>` sale roto (#530). El identificador del
+# proyecto de Masa Madre es `MASAM`; el workspace, `masa-madre-hq`.
+PLANE_WORKSPACE_DEFAULT = "masa-madre-hq"
+PLANE_IDENTIFIER_PREFIX = "MASAM"
 
 
 def map_task_status(raw_status: str) -> str:
@@ -91,11 +99,21 @@ def _extract_plane_issue_from_description(description: str | None) -> str | None
     return issue or None
 
 
-def _build_plane_issue_url(issue_id: str | None) -> str | None:
-    if not issue_id:
+def _plane_seq(task_id: str | None) -> int | None:
+    """`plane-530` → 530. None si el id no es un issue de Plane."""
+    candidate = str(task_id or "").strip()
+    if not candidate.startswith("plane-"):
         return None
-    if settings.plane_issues_base_url:
-        return f"{settings.plane_issues_base_url.rstrip('/')}/{issue_id}"
+    try:
+        return int(candidate.split("plane-", 1)[1])
+    except (TypeError, ValueError):
+        return None
+
+
+def _plane_browse_url(seq: int | str | None) -> str | None:
+    """URL verificada de Plane: `.../<workspace>/browse/MASAM-<seq>/`."""
+    if seq is None or str(seq).strip() == "":
+        return None
     base_url = (settings.plane_base_url or settings.plane_api_url or "").strip().rstrip("/")
     if not base_url:
         return None
@@ -103,20 +121,36 @@ def _build_plane_issue_url(issue_id: str | None) -> str | None:
         base_url = base_url.replace("api.plane.so", "app.plane.so")
     if "/api/" in base_url:
         base_url = base_url.split("/api/", 1)[0]
-    workspace = (settings.plane_workspace_slug or "").strip()
-    project = (settings.plane_project_id or "").strip()
-    if workspace and project:
-        return f"{base_url}/{workspace}/projects/{project}/issues/{issue_id}"
-    # Generic web fallback when workspace/project are unavailable.
-    return f"{base_url}/issues/{issue_id}"
+    workspace = (settings.plane_workspace_slug or PLANE_WORKSPACE_DEFAULT).strip() or PLANE_WORKSPACE_DEFAULT
+    return f"{base_url}/{workspace}/browse/{PLANE_IDENTIFIER_PREFIX}-{seq}/"
 
 
-def _normalize_plane_issue_url(raw_url: str | None, issue_id: str | None) -> str | None:
+def _build_plane_issue_url(issue_id: str | None, seq: int | str | None = None) -> str | None:
+    # [#530] Con el número de issue (seq) se arma el enlace BUENO (/browse/MASAM-<seq>/).
+    browse = _plane_browse_url(seq)
+    if browse:
+        return browse
+    if not issue_id:
+        return None
+    if settings.plane_issues_base_url:
+        return f"{settings.plane_issues_base_url.rstrip('/')}/{issue_id}"
+    # [#530] Sin `seq` no se puede armar el enlace BUENO (/browse/MASAM-<seq>/) y el formato
+    # viejo `/projects/<uuid>/issues/<uuid>` YA NO EXISTE. Antes que devolver un enlace muerto
+    # (el botón abría una página rota), devolvemos None: el War Room esconde «Abrir Plane».
+    return None
+
+
+def _normalize_plane_issue_url(raw_url: str | None, issue_id: str | None, seq: int | str | None = None) -> str | None:
+    # [#530] Si conocemos el seq, SIEMPRE preferimos el enlace bueno (/browse/MASAM-<seq>/):
+    # la fila guardada en `plane_sync` trae el formato VIEJO (/projects/<uuid>/issues/<uuid>).
+    browse = _plane_browse_url(seq)
+    if browse:
+        return browse
     candidate = (raw_url or "").strip()
     if candidate.startswith(("http://", "https://")):
         return candidate
     # Legacy placeholder scheme should never be exposed to browser users.
-    return _build_plane_issue_url(issue_id)
+    return _build_plane_issue_url(issue_id, seq)
 
 
 def _load_plane_sync_map(session: Session, task_ids: list[str]) -> dict[str, dict[str, Any]]:
@@ -200,24 +234,47 @@ def _load_channel_events(session: Session, *, channel: str, limit: int) -> list[
     return [dict(row._mapping) for row in rows]
 
 
-def _load_whatsapp_conversation_events(session: Session, *, limit: int) -> list[dict[str, Any]]:
-    safe_limit = max(1, min(limit, 5000))
+def _load_whatsapp_conversation_events(
+    session: Session, *, limit: int, hard_max: int = 5000,
+    phone_like: str | None = None,
+) -> list[dict[str, Any]]:
+    # `hard_max` levanta la ventana de «N más recientes» para los filtros que
+    # recorren todo el histórico (texto/nombre/fechas). `phone_like` añade,
+    # además de esa ventana, TODOS los eventos de un teléfono concreto — así se
+    # ve el histórico viejo (2022–2026) recuperado del respaldo del iPhone
+    # (issue #579) sin cargar todo en cada refresco de la vista.
+    safe_limit = max(1, min(limit, max(1, int(hard_max))))
+    select_sql = (
+        "SELECT id, task_id, event_type, event_summary, payload_json, occurred_at "
+        "FROM task_events WHERE event_type IN "
+        "('whatsapp_message_received','whatsapp_message_sent',"
+        "'telegram_message_received','telegram_message_sent','telegram_send_message') "
+    )
     try:
-        rows = session.connection().execute(
-            text(
-                """
-                SELECT id, task_id, event_type, event_summary, payload_json, occurred_at
-                FROM task_events
-                WHERE event_type IN ('whatsapp_message_received', 'whatsapp_message_sent')
-                ORDER BY occurred_at DESC
-                LIMIT :limit
-                """
-            ),
+        filas = session.connection().execute(
+            text(select_sql + "ORDER BY occurred_at DESC LIMIT :limit"),
             {"limit": safe_limit},
         ).fetchall()
+        salida = [dict(fila._mapping) for fila in filas]
+        digitos = re.sub(r"\D", "", phone_like or "")
+        if digitos:
+            # El '1' mexicano se mete/quita entre formas ('521…' ↔ '52…'); los
+            # últimos 10 dígitos son comunes a ambas, así que se busca por ahí.
+            extra = session.connection().execute(
+                text(select_sql + "AND payload_json LIKE :pat "
+                                  "ORDER BY occurred_at DESC LIMIT :limit"),
+                {"pat": "%" + digitos[-10:] + "%",
+                 "limit": max(1, min(limit, 200_000))},
+            ).fetchall()
+            vistos = {fila["id"] for fila in salida}
+            for fila in extra:
+                dato = dict(fila._mapping)
+                if dato["id"] not in vistos:
+                    vistos.add(dato["id"])
+                    salida.append(dato)
     except Exception:
         return []
-    return [dict(row._mapping) for row in rows]
+    return salida
 
 
 def _extract_client_key_from_event_payload(payload: dict[str, Any]) -> str | None:
@@ -415,7 +472,10 @@ def list_dashboard_tasks(
     limit: int = 120,
 ) -> dict[str, Any]:
     safe_limit = max(1, min(limit, 400))
-    query = select(Task).order_by(Task.updated_at.desc())
+    # [ventana-7d 01-oct-2026] El tablero es ESPEJO del motor: solo las tareas
+    # plane-<seq> del catálogo vigente, de más reciente a menos por fecha REAL de Plane.
+    query = (select(Task).where(Task.id.like("plane-%"))
+             .order_by(Task.created_at.desc(), Task.id.desc()))
     tasks = session.exec(query).all()[:safe_limit]
 
     task_ids = [task.id for task in tasks]
@@ -430,7 +490,9 @@ def list_dashboard_tasks(
         queue_priority = normalize_priority(queue.priority) if queue else "medium"
         plane_sync = plane_sync_map.get(task.id, {})
         plane_issue_id = plane_sync.get("plane_issue_id") or _extract_plane_issue_from_description(task.description)
-        plane_issue_url = _normalize_plane_issue_url(plane_sync.get("plane_issue_url"), plane_issue_id)
+        plane_issue_url = _normalize_plane_issue_url(
+            plane_sync.get("plane_issue_url"), plane_issue_id, _plane_seq(task.id)
+        )
         rows.append(
             {
                 "task_id": task.id,
@@ -556,6 +618,7 @@ def get_task_detail(session: Session, task_id: str) -> dict[str, Any] | None:
             "plane_issue_url": _normalize_plane_issue_url(
                 plane_sync.get("plane_issue_url"),
                 plane_sync.get("plane_issue_id") or _extract_plane_issue_from_description(task.description),
+                _plane_seq(task.id),
             ),
         },
         "payload": {
@@ -700,7 +763,15 @@ def get_whatsapp_conversations(
     safe_limit_clients = max(1, min(limit_clients, 100))
     safe_limit_messages = max(1, min(limit_messages_per_client, 200))
     scan_limit = max(300, safe_limit_clients * safe_limit_messages * 4)
-    rows = _load_whatsapp_conversation_events(session, limit=scan_limit)
+    # Si hay un filtro que apunta a algo concreto (teléfono, texto, nombre o
+    # rango de fechas) se levanta el tope para poder pintar el histórico viejo.
+    # El teléfono se resuelve aparte (`phone_like`) para no cargar todo en cada
+    # refresco. Sin filtro, la vista por omisión sigue siendo igual de ligera.
+    enfocado = any((v or "").strip() for v in (q, customer_name,
+                                               date_from, date_to))
+    hard_max = 200_000 if enfocado else 5000
+    rows = _load_whatsapp_conversation_events(session, limit=scan_limit,
+                                              hard_max=hard_max, phone_like=phone)
 
     parsed_events: list[dict[str, Any]] = []
     for row in rows:
@@ -710,7 +781,7 @@ def get_whatsapp_conversations(
             continue
         message_text = _extract_message_text_from_event_payload(payload) or ""
         event_type = str(row.get("event_type") or "")
-        direction = "inbound" if event_type == "whatsapp_message_received" else "outbound"
+        direction = "inbound" if event_type.endswith("_received") else "outbound"
         parsed_events.append(
             {
                 "id": row.get("id"),
@@ -840,14 +911,89 @@ def get_channels_status(session: Session, *, event_preview_limit: int = 5, inact
     }
 
 
+# [#530] Estado LOCAL del espejo → estado tipo Plane, para que las señales de archivo y el
+# corte de cerradas de `carriles` funcionen igual que en el motor (que sí ve Plane directo).
+_LOCAL_A_PLANE_ESTADO = {
+    "completed": "Done",
+    "done": "Done",
+    "cancelled": "Cancelled",
+    "canceled": "Cancelled",
+    "running": "In Progress",
+    "in_progress": "In Progress",
+}
+
+
+def _plane_state_from_local(raw_status: str | None) -> str:
+    return _LOCAL_A_PLANE_ESTADO.get(str(raw_status or "").strip().lower(), "Todo")
+
+
+def _plane_priority_from_labels(labels: list[Any] | None) -> str | None:
+    """Si el issue trae una etiqueta `priority:<nivel>`, se usa; si no, sin prioridad."""
+    for label in labels or []:
+        value = str(label or "").strip().lower()
+        if value.startswith("priority:"):
+            nivel = value.split(":", 1)[1].strip()
+            if nivel in carriles.PRIORIDADES:
+                return nivel
+    return None
+
+
 def get_plane_issues_section(session: Session, *, limit: int = 30) -> dict[str, Any]:
-    items = list_plane_related_issues(session, limit=limit)
+    """Issues Plane relacionados, ya clasificados en las 4 pilas del tablero (#530).
+
+    Cada item trae su `carril`/`carril_motivo` (misma clasificación que el motor, vía
+    `app/services/carriles.py`) y el enlace BUENO de Plane (`/browse/MASAM-<seq>/`). Además
+    del listado plano (`items`), se devuelven las 4 pilas ya agrupadas y en LIFO (`carriles`),
+    para que el War Room pinte columnas sin recargar la lógica en el navegador.
+    """
+    rows = list_plane_related_issues(session, limit=limit)
+
+    items: list[dict[str, Any]] = []
+    filas_por_seq: dict[int, dict[str, Any]] = {}
+
+    for row in rows:
+        item = dict(row)
+        seq = _plane_seq(item.get("task_id"))
+        labels = item.get("labels") if isinstance(item.get("labels"), list) else []
+        item["plane_seq"] = seq
+        item["issue_title"] = item.get("task_title")
+        item["issue_url"] = _normalize_plane_issue_url(item.get("issue_url"), item.get("issue_id"), seq)
+        item["priority"] = _plane_priority_from_labels(labels)
+        item["closed"] = _plane_state_from_local(item.get("issue_state")) in ("Done", "Cancelled")
+
+        fila = {
+            "seq": seq or 0,
+            "name": item.get("task_title") or "",
+            "desc": item.get("task_description") or "",
+            "state": _plane_state_from_local(item.get("issue_state")),
+            "updated": item.get("task_updated_at") or item.get("last_synced_at") or "",
+            "labels": labels,
+            "priority": item.get("priority"),
+        }
+        carril, motivo = carriles.clasificar(fila)
+        item["carril"] = carril
+        item["carril_motivo"] = motivo
+        items.append(item)
+        if seq is not None:
+            filas_por_seq[seq] = fila
+
+    # Agrupa por carril (LIFO dentro de cada uno, `urgent` al frente); las cerradas se omiten
+    # para que las 4 pilas muestren SOLO trabajo que compite por turno.
+    agrupado = carriles.agrupar(list(filas_por_seq.values()), incluir_cerradas=False)
+    por_seq = {item.get("plane_seq"): item for item in items if item.get("plane_seq") is not None}
+    carriles_out = {
+        carril: [por_seq[fila["seq"]] for fila in agrupado.get(carril, []) if fila.get("seq") in por_seq]
+        for carril in carriles.CARRILES
+    }
+
     return {
         "generated_at": datetime.utcnow(),
         "total": len(items),
+        "abiertos": sum(len(lista) for lista in carriles_out.values()),
+        "orden_carriles": list(carriles.CARRILES),
+        "carriles": carriles_out,
         "items": items,
     }
-
 
 def run_quick_task(session: Session, *, channel: str, title: str, description: str | None, launch_swarm: bool) -> dict[str, Any]:
     from app.domain.tasks.models import TaskRunCreate

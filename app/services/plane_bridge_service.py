@@ -13,7 +13,7 @@ from app.core.roles import roles_config
 from app.domain.swarm.models import SwarmCreate, SwarmRunCreate
 from app.domain.swarm.service import create_swarm, run_swarm_cycle
 from app.domain.tasks.models import Task
-from app.integrations.plane import comment_on_issue, create_issue, list_issues, update_issue
+from app.integrations.plane import comment_on_issue, create_issue, labels_for_issues, list_issues, update_issue
 
 
 def ensure_plane_bridge_tables(session: Session) -> None:
@@ -140,6 +140,91 @@ def _strip_html(raw: str | None) -> str:
     text_only = re.sub(r"<[^>]+>", " ", source)
     compact = re.sub(r"\s+", " ", text_only).strip()
     return compact
+
+
+def _build_swarm_contract(title: str, description: str, issue_id: str = "") -> str:
+    """Genera un contrato estructurado basado en la Regla #20 + el issue específico."""
+    # Cargar Regla #20 como base del contrato
+    base_rules = _load_contract_rules()
+    
+    desc_section = ""
+    if description.strip():
+        desc_section = f"""### 📋 Descripción de la tarea
+{description[:3000]}"""
+    
+    return f"""## CONTRATO DE ENJAMBRE — {title[:80]}
+
+{base_rules}
+
+### 🎯 Objetivo
+{title}
+
+{desc_section}
+
+### 📦 OUTPUT REQUERIDO (OBLIGATORIO)
+Al terminar la ejecución, el compiled_message DEBE contener:
+- **Archivos creados/modificados:** rutas exactas de cada archivo
+- **Resultados concretos:** datos, URLs, números, paths generados
+- **Resumen ejecutivo:** qué se logró en 2-3 frases
+
+### ⚠️ REGLAS DURAS DEL SISTEMA
+- NUNCA votar accept sin output verificable
+- SIEMPRE incluir rutas exactas y resultados concretos
+- Si no se pudo completar, explicar POR QUÉ y votar reject
+- 🧠 Protocolo VERIFICA activo: leer, verificar, no asumir
+- 📦 Backup antes de modificar archivos existentes
+- 🧹 Cero huérfanos: no dejar temporales ni archivos basura
+- 📝 Reporte estructurado al finalizar
+
+### 📬 Entrega
+El resultado de este enjambre se posteará automáticamente como comentario en el issue de Plane {issue_id}. El output será visible para revisión."""
+
+
+def _load_contract_rules() -> str:
+    """Carga las reglas del Contrato de Enjambre desde Plane (Regla #20)."""
+    try:
+        pull = list_issues(limit=30, labels=["metiche"])
+        if not pull.ok:
+            return _default_rules()
+        rows = _extract_issue_rows(pull.data)
+        for row in rows:
+            name = str(row.get("name") or "").strip()
+            if "Regla" in name and "20" in name and "Contrato" in name:
+                html = str(row.get("description_html") or "")
+                text = _strip_html(html)
+                if "Requisitos obligatorios" in text:
+                    # Extract the numbered requirements
+                    lines = text.split("\n")
+                    rules = []
+                    in_rules = False
+                    for line in lines:
+                        if "Requisitos obligatorios" in line:
+                            in_rules = True
+                            continue
+                        if in_rules:
+                            clean = line.strip()
+                            if clean and (clean[0].isdigit() or clean.startswith("🧠") or clean.startswith("✅") or clean.startswith("🧱") or clean.startswith("📋") or clean.startswith("🔙") or clean.startswith("📦") or clean.startswith("🧪") or clean.startswith("🧹") or clean.startswith("⏱️") or clean.startswith("📝")):
+                                rules.append(clean)
+                            elif clean == "" and rules:
+                                break
+                    if rules:
+                        return "### 📋 Reglas del Contrato de Enjambre (Regla #20)\n" + "\n".join(rules)
+        return _default_rules()
+    except Exception:
+        return _default_rules()
+
+
+def _default_rules() -> str:
+    """Reglas base si no se puede cargar Regla #20."""
+    return """### 📋 Reglas del Contrato de Enjambre
+1. 🧠 Protocolo VERIFICA — verificar antes de afirmar
+2. ✅ Verificar sintaxis/linter antes de terminar
+3. 🧱 Cambios aditivos solamente
+4. 📋 Inventario de archivos tocados
+5. 📦 Backup antes de modificar
+6. 🧹 Cero huérfanos
+7. 🧪 Smoke test al finalizar
+8. 📝 Reporte estructurado"""
 
 
 def _issue_signature(issue: dict[str, Any]) -> str:
@@ -620,9 +705,8 @@ def process_plane_enjambre_pull(session: Session, *, limit: int = 20) -> dict[st
             continue
 
         issue_title = str(issue.get("name") or issue.get("title") or f"Issue {issue_id}").strip()
-        objective = _strip_html(issue.get("description_html") or issue.get("description")) or issue_title
-        if len(objective) < 10:
-            objective = f"Resolver issue Plane {issue_id}: {issue_title}"
+        raw_desc = _strip_html(issue.get("description_html") or issue.get("description")) or ""
+        objective = _build_swarm_contract(issue_title, raw_desc, issue_id)
         link_result = ensure_plane_issue_task_link(session, issue=issue)
         related_task_id = str(link_result.get("task_id") or "").strip() if link_result.get("ok") else None
 
@@ -645,7 +729,7 @@ def process_plane_enjambre_pull(session: Session, *, limit: int = 20) -> dict[st
                 session,
                 SwarmCreate(
                     name=f"Plane:{issue_title[:60]}",
-                    goal=objective,
+                    goal=objective[:2000],  # Truncado al límite del modelo
                     policy="narrative-consensus",
                     agents=["whatsapp", "telegram", "deepseek", "plane"],
                     parent_issue_id=issue_id,
@@ -700,6 +784,9 @@ def process_plane_enjambre_pull(session: Session, *, limit: int = 20) -> dict[st
             )
         except Exception as exc:  # pragma: no cover - defensivo
             errors.append(f"{issue_id}:{exc}")
+            import traceback
+            print(f"[plane_bridge] ERROR processing issue {issue_id}: {exc}", flush=True)
+            traceback.print_exc()
             processed_count += 1
             _upsert_processed_issue(
                 session,
@@ -726,40 +813,47 @@ def list_plane_related_issues(session: Session, *, limit: int = 30) -> list[dict
             """
             SELECT
                 ps.task_id AS task_id,
-                t.title AS task_title,
+                COALESCE(t.title, ppi.issue_title) AS task_title,
+                t.description AS task_description,
+                t.created_at AS task_created_at,
+                t.updated_at AS task_updated_at,
                 ps.plane_issue_id AS issue_id,
                 ps.plane_issue_url AS issue_url,
                 ps.sync_status AS sync_status,
                 ps.last_synced_at AS last_synced_at,
                 ps.last_error AS last_error,
-                NULL AS issue_state,
-                NULL AS labels_json,
-                NULL AS last_swarm_id,
-                NULL AS last_action,
-                NULL AS processed_at
-            FROM plane_sync ps
-            LEFT JOIN task t ON t.id = ps.task_id
-            UNION ALL
-            SELECT
-                NULL AS task_id,
-                NULL AS task_title,
-                ppi.issue_id AS issue_id,
-                ppi.issue_url AS issue_url,
-                ppi.last_action AS sync_status,
-                ppi.updated_at AS last_synced_at,
-                NULL AS last_error,
-                ppi.issue_state AS issue_state,
+                t.status AS issue_state,
                 ppi.labels_json AS labels_json,
                 ppi.last_swarm_id AS last_swarm_id,
                 ppi.last_action AS last_action,
                 ppi.processed_at AS processed_at
-            FROM plane_processed_issues ppi
-            ORDER BY last_synced_at DESC
+            FROM plane_sync ps
+            LEFT JOIN task t ON t.id = ps.task_id
+            LEFT JOIN plane_processed_issues ppi ON ppi.issue_id = ps.plane_issue_id
+            WHERE ps.task_id LIKE 'plane-%'
+            ORDER BY ps.last_synced_at DESC
             LIMIT :limit
             """
         ),
         {"limit": safe_limit},
     ).fetchall()
+
+    # [#530] El bridge local solo guarda etiquetas de los issues que pasan por el pull de
+    # enjambres; para el resto `labels_json` viene vacío. Enriquecer desde Plane (una sola
+    # consulta) para que el carril se decida por etiqueta y no por palabras clave.
+    _need: list[str] = []
+    for row in rows:
+        _m = dict(row._mapping)
+        _iid = str(_m.get("issue_id") or "").strip()
+        _lv = _safe_json_loads(_m.get("labels_json"))
+        if _iid and not (isinstance(_lv, list) and _lv):
+            _need.append(_iid)
+    fresh_labels: dict[str, list[str]] = {}
+    if _need:
+        try:
+            fresh_labels = labels_for_issues(sorted(set(_need)))
+        except Exception:
+            fresh_labels = {}
 
     output: list[dict[str, Any]] = []
     seen: set[str] = set()
@@ -771,12 +865,17 @@ def list_plane_related_issues(session: Session, *, limit: int = 30) -> list[dict
         seen.add(issue_id)
         labels_value = _safe_json_loads(item.get("labels_json"))
         labels = [str(v) for v in labels_value] if isinstance(labels_value, list) else []
+        if not labels:
+            labels = [str(v) for v in fresh_labels.get(issue_id, [])]
         output.append(
             {
                 "issue_id": issue_id,
                 "issue_url": item.get("issue_url"),
                 "task_id": item.get("task_id"),
                 "task_title": item.get("task_title"),
+                "task_description": item.get("task_description"),
+                "task_created_at": item.get("task_created_at"),
+                "task_updated_at": item.get("task_updated_at"),
                 "sync_status": item.get("sync_status"),
                 "issue_state": item.get("issue_state"),
                 "labels": labels,

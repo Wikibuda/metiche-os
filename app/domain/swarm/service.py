@@ -109,7 +109,7 @@ def run_swarm_cycle(session: Session, swarm_id: str, payload: SwarmRunCreate) ->
     cycle: SwarmCycle | None = None
 
     for _ in range(payload.max_cycles):
-        cycle, votes, decision, accepted_votes, rejected_votes, dispatch_results, dispatch_policy = _execute_single_cycle(
+        cycle, votes, decision, accepted_votes, rejected_votes, dispatch_results, dispatch_policy, compiled_output = _execute_single_cycle(
             session=session,
             swarm=swarm,
             agents=agents,
@@ -198,6 +198,7 @@ def run_swarm_cycle(session: Session, swarm_id: str, payload: SwarmRunCreate) ->
                 "cycles_executed": len(cycle_reads),
                 "stop_reason": stop_reason,
                 "cycle_outcome": cycle.outcome,
+                "compiled_output": compiled_output or "",
                 "dispatch_summary": _dispatch_summary(dispatch_results or {}),
                 "dispatch_policy": dispatch_policy,
                 "dispatch_results": dispatch_payload,
@@ -206,6 +207,13 @@ def run_swarm_cycle(session: Session, swarm_id: str, payload: SwarmRunCreate) ->
             url = plane_issue_url(issue_id)
             summary = f"Decisión: {decision} ({accepted_votes}/{rejected_votes})"
             posted = post_swarm_result_to_plane(issue_id, result_payload)
+            # Marcar como procesado para evitar re-ejecución
+            if posted:
+                try:
+                    from app.services.plane_bridge_service import _upsert_processed_issue
+                    _upsert_processed_issue(session, issue={"id": issue_id}, swarm_id=swarm.id, action="swarm_completed")
+                except Exception:
+                    pass
             if not posted:
                 notify_error(
                     issue_id=issue_id,
@@ -217,8 +225,10 @@ def run_swarm_cycle(session: Session, swarm_id: str, payload: SwarmRunCreate) ->
                 notify_issue_completed(title=swarm.name, issue_id=issue_id, summary=summary, url=url)
             else:
                 notify_error(issue_id=issue_id, title=swarm.name, error_message=summary, url=url)
-        except Exception:
-            pass
+        except Exception as e:
+            import traceback
+            print(f"[plane_commenter] ERROR posting swarm result: {e}", flush=True)
+            traceback.print_exc()
 
     return SwarmRunRead(
         swarm=SwarmRead.from_model(swarm, agents),
@@ -447,7 +457,7 @@ def _execute_single_cycle(
     session.add(cycle)
     session.commit()
 
-    dispatch_results, dispatch_policy = _dispatch_cycle_actions(
+    dispatch_results, dispatch_policy, compiled_message = _dispatch_cycle_actions(
         session=session,
         swarm=swarm,
         agents=agents,
@@ -455,6 +465,10 @@ def _execute_single_cycle(
         payload=payload,
         cycle=cycle,
     )
+    if compiled_message:
+        cycle.outcome = (cycle.outcome or "") + "\n--- AGENT OUTPUT ---\n" + compiled_message[:6000]
+        session.add(cycle)
+        session.commit()
 
     votes: list[SwarmVote] = []
     vote_payload = payload.model_copy(update={"objective": objective})
@@ -501,7 +515,7 @@ def _execute_single_cycle(
     session.add(cycle)
     session.commit()
     session.refresh(cycle)
-    return cycle, votes, decision, accepted_votes, rejected_votes, dispatch_results, dispatch_policy
+    return cycle, votes, decision, accepted_votes, rejected_votes, dispatch_results, dispatch_policy, compiled_message
 
 
 def _dispatch_cycle_actions(
@@ -519,7 +533,7 @@ def _dispatch_cycle_actions(
 
     # Mapeo de agentes internos a task_types del dispatcher
     AGENT_TASK_MAP = {
-        "deepseek": "data_query",
+        "deepseek": "narrative",  # Usa DeepSeek API para análisis
         "plane": "data_query",
         "dashboard": "narrative",
         "knowledge_agent": "semantic_search",
@@ -603,13 +617,16 @@ def _dispatch_cycle_actions(
         }
         channel_policy = _select_dispatch_channels(session, candidate_channels, client_key)
         dispatch_policy = channel_policy
+        # Resumen corto para Telegram
+        short_msg = f"⚙️ Enjambre: {objective[:80]}\n📊 Ver resultado: https://plane.masamadremonterrey.com"
         for channel in channel_policy.get("selected_channels", []):
             channel_client_key = CHANNEL_TARGETS.get(channel, client_key)
+            msg = short_msg if channel == "telegram" else compiled_message
             task = UnifiedTask(
                 task_type="send_message",
                 channel=channel,
                 client_key=channel_client_key,
-                message=compiled_message,
+                message=msg,
                 metadata={
                     "swarm_id": swarm.id,
                     "cycle_id": cycle.id,
@@ -622,7 +639,7 @@ def _dispatch_cycle_actions(
             results[channel] = dispatch_unified_task(session, task)
 
     dispatch_policy["internal_dispatched"] = internal_agents
-    return results, dispatch_policy
+    return results, dispatch_policy, compiled_message
 
 
 def _vote_from_dispatch(agent_name: str, result: DispatchResult) -> tuple[str, str]:

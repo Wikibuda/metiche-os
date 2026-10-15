@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Reporte Ejecutivo</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a1a2e;color:#e0e0e0;font-family:system-ui;padding:24px;max-width:900px;margin:0 auto}
+h1{color:#e94560;border-bottom:2px solid #e94560;padding-bottom:8px;margin-bottom:16px}
+h2{color:#e94560;margin:20px 0 8px}
+h3{color:#cc3340;margin:16px 0 6px}
+table{border-collapse:collapse;width:100%;margin:12px 0}
+th{background:#16213e;color:#e94560;padding:6px 12px;text-align:left;border-bottom:1px solid #333}
+td{padding:6px 12px;border-bottom:1px solid #222}
+tr:nth-child(even){background:#16213e}
+code{background:#0d1117;padding:2px 6px;border-radius:3px;font-size:13px}
+pre{background:#0d1117;padding:12px;border-radius:6px;overflow-x:auto}
+li{margin:4px 0}
+a{color:#e94560}
+</style></head>
+<body>
+<h1>📊 Reporte Ejecutivo — Latido del War Room (Prueba)</h1>
+<br>
+<table>
+<tr><th><strong>Para:</strong> Gus</th><th><strong>Fecha:</strong> 30-sep-2026</th><th><strong>Issue Plane:</strong> <code>6c7e3e38-e006-4bd0-ae34-edbb811052ce</code></th></tr>
+<br>
+<hr>
+<br>
+<h2>⚠️ Veredicto: **NO VERIFICABLE — RECHAZAR (reject)**</h2>
+<br>
+</table>
+<p>No puedo ejecutar ni verificar esta tarea. <strong>No tengo acceso al entorno descrito.</strong></p>
+<br>
+<hr>
+<br>
+<h2>🔍 Por qué no se puede completar</h2>
+<br>
+<li><strong>Sin acceso al filesystem:</strong> no puedo leer <code>~/workspace/metiche-os-migrated-20260408</code> ni <code>data/db/metiche_os.db</code>.</li>
+<li><strong>Sin acceso a Docker:</strong> no puedo inspeccionar el servicio <code>metiche-os-worker</code> ni sus logs.</li>
+<li><strong>Sin acceso a la red interna:</strong> no puedo consultar <code>https://warroom.masamadremonterrey.com</code> ni el Plane Bridge.</li>
+<li><strong>Sin credenciales:</strong> no tengo tokens de Plane, ni acceso a la API del War Room.</li>
+<li><strong>Protocolo VERIFICA:</strong> afirmar que "el bridge procesó el issue" sin evidencia sería exactamente lo que la regla #1 prohíbe.</li>
+<br>
+<hr>
+<br>
+<h2>✅ Lo que SÍ puedo entregar (verificable)</h2>
+<br>
+<p><strong>Archivos creados/modificados:</strong> ninguno (no se tocó el sistema).</p>
+<br>
+<p><strong>Resultados concretos:</strong> ninguno — no hubo ejecución real.</p>
+<br>
+<p><strong>Resumen ejecutivo:</strong> Esta es una tarea de <strong>prueba de latido</strong> que requiere ejecutarse *dentro* del host donde corre Metiche-OS. Como agente sin acceso a ese entorno, no puedo generar el rastro esperado en <code>task</code>/<code>plane_sync</code> ni confirmar la aparición en el tablero. Voto <strong>reject</strong> por falta de output verificable.</p>
+<br>
+<hr>
+<br>
+<h2>🛠️ Cómo desbloquear (acciones concretas para Gus)</h2>
+<br>
+<li><strong>Ejecutar el latido desde el host correcto</strong> (donde vive <code>metiche-os-migrated-20260408</code>):</li>
+<pre>
+# 1. Confirmar que el worker está vivo
+docker ps --filter name=metiche-os-worker
+docker logs --tail 100 metiche-os-worker
+
+# 2. Crear issue de prueba con label run:enjambre en Plane
+#    (vía UI o API con token válido)
+
+# 3. Esperar el ciclo del bridge y verificar rastro en DB
+sqlite3 ~/workspace/metiche-os-migrated-20260408/data/db/metiche_os.db \
+"SELECT id, status, updated_at FROM task ORDER BY updated_at DESC LIMIT 5;"
+sqlite3 ~/workspace/metiche-os-migrated-20260408/data/db/metiche_os.db \
+"SELECT * FROM plane_sync ORDER BY rowid DESC LIMIT 5;"
+
+# 4. Verificar en el tablero
+curl -sI https://warroom.masamadremonterrey.com
+</pre>
+<br>
+<li><strong>Criterios de aceptación medibles</strong> (para el próximo intento):</li>
+<li>[ ] Fila nueva en <code>task</code> con timestamp posterior al issue.</li>
+<li>[ ] Fila correspondiente en <code>plane_sync</code> con <code>plane_issue_id = 6c7e3e38-...</code>.</li>
+<li>[ ] Tarjeta visible en el War Room (captura o HTML con el ID).</li>
+<li>[ ] Log del worker mostrando el evento <code>run:enjambre</code> procesado.</li>
+<br>
+<li><strong>Si quieres que yo lo ejecute:</strong> dame acceso (SSH/exec en el host, o pega aquí la salida de los comandos de arriba) y lo verifico paso a paso.</li>
+<br>
+<hr>
+<br>
+<h2>📌 Recomendación</h2>
+<br>
+<li><strong>Cerrar este issue como reject</strong> (es una prueba, no hay pérdida).</li>
+<li><strong>Reabrir como tarea operativa</strong> asignada a un agente con acceso al host de Metiche-OS, o ejecutarla manualmente con el checklist de arriba.</li>
+<li><strong>No votar accept</strong> — no hay output verificable, y la regla dura del sistema lo prohíbe explícitamente.</li>
+</body></html>

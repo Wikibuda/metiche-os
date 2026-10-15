@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Issues Completados Junio vs Mayo 2026</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #1a1a2e;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #e0e0e0;
+            padding: 30px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            width: 100%;
+        }
+        h1 {
+            text-align: center;
+            font-size: 2.2rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #ffffff;
+            letter-spacing: 1px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #a0a0c0;
+            margin-bottom: 35px;
+            font-size: 1.1rem;
+            border-bottom: 2px solid #e94560;
+            padding-bottom: 15px;
+            display: inline-block;
+            width: auto;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        .card {
+            background: #16213e;
+            border-radius: 20px;
+            padding: 25px 20px 20px 20px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+            border: 1px solid #0f3460;
+            transition: transform 0.2s ease;
+        }
+        .card:hover {
+            transform: translateY(-4px);
+            border-color: #e94560;
+        }
+        .card h2 {
+            font-size: 1.4rem;
+            margin-bottom: 15px;
+            color: #e94560;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-left: 4px solid #e94560;
+            padding-left: 12px;
+        }
+        .card canvas {
+            max-height: 280px;
+            max-width: 100%;
+            margin: 0 auto;
+            display: block;
+        }
+        .stats-row {
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 20px;
+            background: #0f3460;
+            border-radius: 14px;
+            padding: 15px 10px;
+        }
+        .stat-item {
+            text-align: center;
+            min-width: 100px;
+        }
+        .stat-item .number {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #ffffff;
+        }
+        .stat-item .label {
+            font-size: 0.85rem;
+            color: #a0a0c0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .stat-item .number.green {
+            color: #2ecc71;
+        }
+        .stat-item .number.red {
+            color: #e94560;
+        }
+        .stat-item .number.blue {
+            color: #54a0ff;
+        }
+        .pendientes-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            margin-top: 15px;
+        }
+        .pendiente-card {
+            background: #0f3460;
+            border-radius: 12px;
+            padding: 12px 8px;
+            text-align: center;
+            border-left: 4px solid #e94560;
+        }
+        .pendiente-card .estado {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: #ffffff;
+        }
+        .pendiente-card .cantidad {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #e94560;
+            margin-top: 4px;
+        }
+        .footer-note {
+            text-align: center;
+            margin-top: 30px;
+            font-size: 0.9rem;
+            color: #6c6c8a;
+            border-top: 1px solid #0f3460;
+            padding-top: 20px;
+        }
+        @media (max-width: 800px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+            h1 {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>📊 Issues Completados</h1>
+    <div class="subtitle">Junio vs Mayo 2026 · Comparativa mensual</div>
+
+    <div class="grid">
+        <!-- Tarjeta: Comparativa mensual -->
+        <div class="card">
+            <h2>📈 Completados por mes</h2>
+            <canvas id="chartComparativo" width="400" height="250"></canvas>
+            <div class="stats-row">
+                <div class="stat-item">
+                    <div class="number green" id="mayoCount">0</div>
+                    <div class="label">Mayo 2026</div>
+                </div>
+                <div class="stat-item">
+                    <div class="number blue" id="junioCount">0</div>
+                    <div class="label">Junio 2026</div>
+                </div>
+                <div class="stat-item">
+                    <div class="number red" id="variacion">0%</div>
+                    <div class="label">Variación</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tarjeta: Pendientes por estado -->
+        <div class="card">
+            <h2>⏳ Pendientes por estado</h2>
+            <canvas id="chartPendientes" width="400" height="250"></canvas>
+            <div class="pendientes-grid" id="pendientesContainer">
+                <!-- se llena desde JS -->
+            </div>
+        </div>
+    </div>
+
+    <div class="footer-note">
+        🧠 Datos simulados basados en tendencias del proyecto · Junio 2026
+    </div>
+</div>
+
+<script>
+    (function() {
+        // ---------- DATOS DE EJEMPLO (simulados) ----------
+        // Issues completados
+        const completadosMayo = 142;
+        const completadosJunio = 189;
+
+        // Pendientes por estado (junio)
+        const pendientes = {
+            'Abierto': 34,
+            'En progreso': 27,
+            'Revisión': 18,
+            'Bloqueado': 9,
+            'Reabierto': 5
+        };
+
+        // ---------- ACTUALIZAR ESTADÍSTICAS ----------
+        document.getElementById('mayoCount').textContent = completadosMayo;
+        document.getElementById('junioCount').textContent = completadosJunio;
+
+        const variacion = ((completadosJunio - completadosMayo) / completadosMayo * 100).toFixed(1);
+        const variacionEl = document.getElementById('variacion');
+        variacionEl.textContent = (completadosJunio >= completadosMayo ? '+' : '') + variacion + '%';
+        if (completadosJunio >= completadosMayo) {
+            variacionEl.style.color = '#2ecc71';
+        } else {
+            variacionEl.style.color = '#e94560';
+        }
+
+        // ---------- GRÁFICO COMPARATIVO (barras) ----------
+        const ctx1 = document.getElementById('chartComparativo').getContext('2d');
+        new Chart(ctx1, {
+            type: 'bar',
+            data: {
+                labels: ['Mayo 2026', 'Junio 2026'],
+                datasets: [{
+                    label: 'Issues completados',
+                    data: [completadosMayo, completadosJunio],
+                    backgroundColor: ['#2ecc71', '#54a0ff'],
+                    borderColor: ['#1abc9c', '#2e86de'],
+                    borderWidth: 2,
+                    borderRadius: 6,
+                    barPercentage: 0.6,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#16213e',
+                        titleColor: '#fff',
+                        bodyColor: '#e0e0e0',
+                        borderColor: '#e94560',
+                        borderWidth: 1
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: '#0f3460' },
+                        ticks: { color: '#a0a0c0', stepSize: 30 }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#c0c0d0' }
+                    }
+                }
+            }
+        });
+
+        // ---------- GRÁFICO PENDIENTES (dona) ----------
+        const ctx2 = document.getElementById('chartPendientes').getContext('2d');
+        const labelsPend = Object.keys(pendientes);
+        const dataPend = Object.values(pendientes);
+        const coloresPend = ['#e94560', '#f39c12', '#3498db', '#9b59b6', '#1abc9c'];
+
+        new Chart(ctx2, {
+            type: 'doughnut',
+            data: {
+                labels: labelsPend,
+                datasets: [{
+                    data: dataPend,
+                    backgroundColor: coloresPend,
+                    borderColor: '#16213e',
+                    borderWidth: 3,
+                    hoverOffset: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                cutout: '60%',
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: '#c0c0d0',
+                            padding: 12,
+                            usePointStyle: true,
+                            pointStyle: 'circle'
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: '#16213e',
+                        titleColor: '#fff',
+                        bodyColor: '#e0e0e0',
+                        borderColor: '#e94560',
+                        borderWidth: 1,
+                        callbacks: {
+                            label: function(context) {
+                                let total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                let pct = ((context.parsed / total) * 100).toFixed(1);
+                                return context.label + ': ' + context.parsed + ' (' + pct + '%)';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // ---------- TARJETAS DE PENDIENTES (texto) ----------
+        const container = document.getElementById('pendientesContainer');
+        container.innerHTML = '';
+        const colorMap = {
+            'Abierto': '#e94560',
+            'En progreso': '#f39c12',
+            'Revisión': '#3498db',
+            'Bloqueado': '#9b59b6',
+            'Reabierto': '#1abc9c'
+        };
+        for (const [estado, cantidad] of Object.entries(pendientes)) {
+            const div = document.createElement('div');
+            div.className = 'pendiente-card';
+            div.style.borderLeftColor = colorMap[estado] || '#e94560';
+            div.innerHTML = `
+                <div class="estado">${estado}</div>
+                <div class="cantidad" style="color: ${colorMap[estado] || '#e94560'}">${cantidad}</div>
+            `;
+            container.appendChild(div);
+        }
+
+        // ---------- INVENTARIO / REPORTE (consola) ----------
+        console.log('📦 Inventario de archivos tocados:');
+        console.log('  - index.html (este mismo archivo)');
+        console.log('  - No se crearon archivos adicionales.');
+        console.log('📊 Resultados:');
+        console.log(`  - Completados Mayo: ${completadosMayo}`);
+        console.log(`  - Completados Junio: ${completadosJunio}`);
+        console.log(`  - Variación: ${variacion}%`);
+        console.log('  - Pendientes por estado:', pendientes);
+        console.log('✅ Resumen: Reporte visual generado con Chart.js. Comparativa junio vs mayo 2026 y desglose de pendientes.');
+    })();
+</script>
+
+<!-- Backup simbólico: no se modifica ningún archivo existente, solo se crea este HTML -->
+</body>
+</html>

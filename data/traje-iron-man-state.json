@@ -16,5 +16,6 @@
     "ok": true,
     "telegram_notified": true
   },
-  "next_execution": "2026-06-01T03:00:00+00:00"
+  "next_execution": "2026-10-01T09:00:00+00:00",
+  "nota_rearme": "Re-armado el 30-sep-2026 (estaba colgado desde el 1-jun por un typo en el except)"
 }

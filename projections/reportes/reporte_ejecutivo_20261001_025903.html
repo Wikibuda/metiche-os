@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Reporte Ejecutivo</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a1a2e;color:#e0e0e0;font-family:system-ui;padding:24px;max-width:900px;margin:0 auto}
+h1{color:#e94560;border-bottom:2px solid #e94560;padding-bottom:8px;margin-bottom:16px}
+h2{color:#e94560;margin:20px 0 8px}
+h3{color:#cc3340;margin:16px 0 6px}
+table{border-collapse:collapse;width:100%;margin:12px 0}
+th{background:#16213e;color:#e94560;padding:6px 12px;text-align:left;border-bottom:1px solid #333}
+td{padding:6px 12px;border-bottom:1px solid #222}
+tr:nth-child(even){background:#16213e}
+code{background:#0d1117;padding:2px 6px;border-radius:3px;font-size:13px}
+pre{background:#0d1117;padding:12px;border-radius:6px;overflow-x:auto}
+li{margin:4px 0}
+a{color:#e94560}
+</style></head>
+<body>
+<h1>📊 Reporte Ejecutivo — Prueba de Latido del War Room</h1>
+<br>
+<table>
+<tr><th><strong>Para:</strong> Gus</th><th><strong>Fecha:</strong> 30-sep-2026</th><th><strong>Issue Plane:</strong> <code>6c7e3e38-e006-4bd0-ae34-edbb811052ce</code></th></tr>
+<br>
+<hr>
+<br>
+<h2>🎯 Veredicto en 30 segundos</h2>
+<br>
+</table>
+<p><strong>No puedo ejecutar esta prueba desde aquí.</strong> Este enjambre opera en un entorno de ejecución de código aislado, <strong>sin acceso a tu infraestructura local</strong> (<code>~/workspace/metiche-os-migrated-20260408</code>, Docker <code>metiche-os-worker</code>, ni la DB <code>data/db/metiche_os.db</code>). Cualquier "resultado" que reportara sería inventado — violaría el <strong>Protocolo VERIFICA</strong> y la regla dura *"NUNCA votar accept sin output verificable"*.</p>
+<br>
+<p><strong>Voto: <code>reject</code></strong> — con explicación de causa raíz y plan accionable.</p>
+<br>
+<hr>
+<br>
+<h2>🔍 Diagnóstico: por qué no se puede completar aquí</h2>
+<br>
+<table>
+<tr><th>Requisito del contrato</th><th>Disponibilidad en este entorno</th></tr>
+<tr><td>Acceso a <code>~/workspace/metiche-os-migrated-20260408</code></td><td>❌ No existe</td></tr>
+<tr><td>Servicio Docker <code>metiche-os-worker</code></td><td>❌ Sin acceso a Docker host</td></tr>
+<tr><td>DB <code>data/db/metiche_os.db</code> (tablas <code>task</code>, <code>plane_sync</code>)</td><td>❌ Sin acceso</td></tr>
+<tr><td>Tablero <code>https://warroom.masamadremonterrey.com</code></td><td>❌ Sin credenciales ni red</td></tr>
+<tr><td>API de Plane (issue <code>6c7e3e38-...</code>)</td><td>❌ Sin token</td></tr>
+<br>
+</table>
+<p><strong>Conclusión:</strong> el enjambre fue despachado a un runner genérico, no al host de Metiche-OS. El bridge <strong>sí procesó el issue</strong> (llegó hasta aquí), pero el *latido* no puede confirmarse end-to-end desde este lado.</p>
+<br>
+<hr>
+<br>
+<h2>✅ Lo que SÍ queda verificado (evidencia parcial del latido)</h2>
+<br>
+<li><strong>Plane → Enjambre funciona:</strong> el issue con etiqueta <code>run:enjambre</code> fue detectado y despachado a un enjambre. ✅</li>
+<li><strong>Payload íntegro:</strong> el contrato llegó completo (reglas, objetivo, criterio de aceptación, ID de issue). ✅</li>
+<li><strong>Pendiente de verificar:</strong> Enjambre → War Room (escritura en <code>task</code>/<code>plane_sync</code> + render en tablero). ❌</li>
+<br>
+<p>Es decir: <strong>el latido tiene pulso en la mitad del circuito, no en la otra.</strong></p>
+<br>
+<hr>
+<br>
+<h2>🛠️ Plan accionable para cerrar la prueba (ejecutar en el host Metiche-OS)</h2>
+<br>
+<p><strong>Paso 1 — Confirmar que el worker vio el issue:</strong></p>
+<pre>
+docker logs metiche-os-worker --since 10m | grep -i "6c7e3e38\|run:enjambre"
+</pre>
+<br>
+<p><strong>Paso 2 — Verificar rastro en DB:</strong></p>
+<pre>
+sqlite3 ~/workspace/metiche-os-migrated-20260408/data/db/metiche_os.db \
+"SELECT id, title, status, updated_at FROM task WHERE title LIKE '%Latido%' ORDER BY updated_at DESC LIMIT 5;"
+sqlite3 ~/workspace/metiche-os-migrated-20260408/data/db/metiche_os.db \
+"SELECT * FROM plane_sync WHERE plane_issue_id='6c7e3e38-e006-4bd0-ae34-edbb811052ce';"
+</pre>
+<br>
+<p><strong>Paso 3 — Confirmar render en War Room:</strong></p>
+<li>Abrir <code>https://warroom.masamadremonterrey.com</code> → buscar "Latido del War Room" en el panel.</li>
+<li>Si aparece → <strong>latido confirmado</strong>, cerrar issue.</li>
+<li>Si no aparece pero hay fila en DB → bug de frontend/render.</li>
+<li>Si no hay fila en DB → bug del bridge (worker no persiste).</li>
+<br>
+<p><strong>Paso 4 — Si falla en Paso 1:</strong> el bridge no está suscrito a la etiqueta <code>run:enjambre</code> o el polling está caído. Revisar config del bridge y reiniciar worker.</p>
+<br>
+<hr>
+<br>
+<h2>📦 Output requerido (formato del contrato)</h2>
+<br>
+<li><strong>Archivos creados/modificados:</strong> ninguno (no hubo acceso al filesystem objetivo).</li>
+<li><strong>Resultados concretos:</strong> ninguno verificable desde este entorno. Evidencia parcial: issue despachado correctamente a un enjambre.</li>
+<li><strong>Resumen ejecutivo:</strong> El bridge de Plane <strong>sí detectó y despachó</strong> el issue <code>run:enjambre</code>, pero este runner <strong>no tiene acceso</strong> al host Metiche-OS para verificar la escritura en <code>metiche_os.db</code> ni el render en el War Room. Se entrega plan de verificación ejecutable en el host correcto.</li>
+<br>
+<hr>
+<br>
+<h2>🗳️ Voto</h2>
+<br>
+<p><strong><code>reject</code></strong> — no por fallo del sistema, sino por <strong>imposibilidad de verificar</strong> desde este entorno. Re-despachar el enjambre al runner con acceso a <code>~/workspace/metiche-os-migrated-20260408</code> y Docker, o ejecutar los 4 pasos del plan manualmente.</p>
+<br>
+<p><strong>Cero huérfanos:</strong> no se crearon temporales ni archivos basura. ✅</p>
+</body></html>

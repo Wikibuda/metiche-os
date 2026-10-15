@@ -34,3 +34,10 @@ sessions/
 openclaw.json.backup.context
 data/openclaw-autoreply-state.json
 projections/bitacora/bitacora_de_asombros.md
+
+# --- Release Candidate 2026-10-15: excluir dumps gigantes y archivos con secretos ---
+*.bak-*
+data/db/*.db.bak*
+data/db/*.corrupto*
+data/db/*.reemplazada*
+datos/recuperado_tg_*.json
